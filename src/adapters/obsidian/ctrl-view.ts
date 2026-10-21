@@ -79,7 +79,7 @@ export class CtrlView extends ItemView {
 	async onOpen() {
 		this.scope?.register([], 'Escape', () => {
 			this.sel = null;
-			this.render();
+			this.draw();
 			return false;
 		});
 		await this.refresh();
@@ -91,7 +91,7 @@ export class CtrlView extends ItemView {
 		} catch (e) {
 			this.hint = `load failed · ${(e as Error).message}`;
 		}
-		this.render();
+		this.draw();
 	}
 
 	private get win() {
@@ -106,7 +106,7 @@ export class CtrlView extends ItemView {
 	private topic(id: string | null) {
 		return this.visibleTopics().find((t) => t.id === id);
 	}
-	private open(path: string) {
+	private openNote(path: string) {
 		void this.app.workspace.openLinkText(path, '', 'tab');
 	}
 
@@ -120,7 +120,7 @@ export class CtrlView extends ItemView {
 		await this.refresh();
 	}
 
-	render() {
+	draw() {
 		const root = this.contentEl;
 		root.empty();
 		root.addClass('ctrl');
@@ -147,7 +147,7 @@ export class CtrlView extends ItemView {
 		const all = crumbs.createSpan({ text: 'Alle Themen', cls: t ? 'ctrl-link' : 'ctrl-strong' });
 		all.onclick = () => {
 			this.sel = null;
-			this.render();
+			this.draw();
 		};
 		if (t) {
 			crumbs.createSpan({ text: ' › ', cls: 'ctrl-mono ctrl-muted' });
@@ -164,14 +164,14 @@ export class CtrlView extends ItemView {
 			const b = seg.createEl('button', { text: label, cls: this.mode === m ? 'is-active' : '' });
 			b.onclick = () => {
 				this.mode = m;
-				this.render();
+				this.draw();
 			};
 		}
 		const r = right.createEl('button', { text: this.runde ? 'runde · an' : 'runde · aus', cls: 'ctrl-btn' + (this.runde ? ' is-active' : '') });
 		r.onclick = () => {
 			this.runde = !this.runde;
 			if (this.sel && !this.topic(this.sel)) this.sel = null;
-			this.render();
+			this.draw();
 		};
 		right.createSpan({ text: this.clock.today(), cls: 'ctrl-mono ctrl-small' });
 		const re = right.createEl('button', { text: '↻', cls: 'ctrl-btn' });
@@ -337,9 +337,9 @@ export class CtrlView extends ItemView {
 			const hit = svg('path', { d: sectorPath(R0, RMAX + 20, a0, a1), class: 'ctrl-hit' }, g);
 			hit.onclick = () => {
 				this.sel = this.sel === t.id ? null : t.id;
-				this.render();
+				this.draw();
 			};
-			hit.ondblclick = () => this.open(t.path);
+			hit.ondblclick = () => this.openNote(t.path);
 			const related = new Set([t.id, ...t.needs, ...t.blockedBy, ...topics.filter((x) => x.needs.includes(t.id) || x.blockedBy.includes(t.id)).map((x) => x.id)]);
 			hit.onmouseenter = () => {
 				s.addClass('has-hover');
@@ -382,7 +382,7 @@ export class CtrlView extends ItemView {
 			.join(' · ');
 		head.createSpan({ text: flags, cls: 'ctrl-mono ctrl-small' + (sg.blocked ? ' ctrl-energy' : ' ctrl-muted') });
 		const name = card.createDiv({ text: t.name, cls: 'ctrl-name ctrl-link' });
-		name.onclick = () => this.open(t.path);
+		name.onclick = () => this.openNote(t.path);
 
 		const actions = card.createDiv({ cls: 'ctrl-actions' });
 		const btn = (label: string, fn: () => void) => {
@@ -391,7 +391,7 @@ export class CtrlView extends ItemView {
 		};
 		btn('▲ priorität', () => this.data && void this.write(() => this.service.movePrio(this.data as BoardData, t.id, -1)));
 		btn('▼ priorität', () => this.data && void this.write(() => this.service.movePrio(this.data as BoardData, t.id, 1)));
-		btn('↗ notiz', () => this.open(t.path));
+		btn('↗ notiz', () => this.openNote(t.path));
 
 		const box = card.createDiv({ cls: 'ctrl-statusbox' });
 		box.createDiv({ text: 'STATUS · MANUELL', cls: 'ctrl-mono ctrl-tiny ctrl-muted' });
@@ -437,7 +437,7 @@ export class CtrlView extends ItemView {
 				const sp = k.createSpan({ text: id, cls: 'ctrl-link' + (t.blockedBy.includes(id) ? ' ctrl-energy' : '') });
 				sp.onclick = () => {
 					this.sel = id;
-					this.render();
+					this.draw();
 				};
 				k.createSpan({ text: ' ' });
 			};
@@ -452,7 +452,7 @@ export class CtrlView extends ItemView {
 			const r = ev.createDiv({ cls: 'ctrl-item ctrl-link' });
 			r.createSpan({ text: `${mmdd(e.at)} · ${short(e.title, 32)}` });
 			r.createSpan({ text: e.conf >= 1 ? 'thema' : 'link', cls: 'ctrl-mono ctrl-small ctrl-muted' });
-			r.onclick = () => this.open(e.path);
+			r.onclick = () => this.openNote(e.path);
 		}
 	}
 
@@ -520,7 +520,7 @@ export class CtrlView extends ItemView {
 			const tg = r.createSpan({ text: tag, cls: 'ctrl-mono ctrl-small ctrl-link' });
 			tg.onclick = () => {
 				this.sel = tag === 'main' ? null : tag;
-				this.render();
+				this.draw();
 			};
 		}
 		r.createSpan({ text: st.text, cls: 'ctrl-grow' + (st.done ? ' is-done' : '') });
@@ -535,7 +535,7 @@ export class CtrlView extends ItemView {
 			const tg = r.createSpan({ text: t?.id ?? 'main', cls: 'ctrl-mono ctrl-small ctrl-link' });
 			tg.onclick = () => {
 				this.sel = t?.id ?? null;
-				this.render();
+				this.draw();
 			};
 		}
 		r.createSpan({ text: q.text.replace(/@\S+/g, '').trim(), cls: 'ctrl-grow' });
@@ -558,7 +558,7 @@ export class CtrlView extends ItemView {
 		for (const e of evs.slice(0, 60)) {
 			const it = grid.createDiv({ cls: 'ctrl-ua-item' });
 			const lbl = it.createSpan({ text: `${mmdd(e.at)} · ${short(e.title, 28)}`, cls: 'ctrl-link ctrl-grow', attr: { title: e.path } });
-			lbl.onclick = () => this.open(e.path);
+			lbl.onclick = () => this.openNote(e.path);
 			const b = it.createEl('button', { text: t ? `→ ${t.id}` : '→', cls: 'ctrl-btn ctrl-btn-xs' });
 			b.disabled = !t;
 			b.onclick = () => {
