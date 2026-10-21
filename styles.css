@@ -157,3 +157,9 @@
 	.ctrl .ctrl-stage { grid-template-columns: 1fr; }
 	.ctrl .ctrl-unassigned { grid-template-columns: 1fr; }
 }
+
+.ctrl .ctrl-metric { color: var(--ctrl-fg-2); margin-top: -6px; }
+.ctrl .ctrl-cd { align-items: center; }
+.ctrl .ctrl-cd-bar { width: 28px; height: 4px; flex: none; background: var(--ctrl-surface-overlay); border-radius: 1px; overflow: hidden; }
+.ctrl .ctrl-cd-fill { display: block; height: 100%; background: var(--ctrl-fg-2); }
+.ctrl .ctrl-cd.is-still .ctrl-grow { color: var(--ctrl-fg-2); }

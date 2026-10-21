@@ -14,7 +14,8 @@ id: S2
 - [x] AL-Bild getragen ✅ 2026-09-29
 - [ ] Konzept fertigstellen #fokus
   - [ ] Teilschritt
-### S2.1 Regionen anbinden
+### S2.1 Regionen anbinden #cd
+Messung: 2 Regionen produktiv
 - [ ] EMEA
 
 ## Offene Fragen
@@ -35,6 +36,10 @@ describe('parseBody', () => {
 		expect(p.goals[0]?.steps[0]).toMatchObject({ done: true, doneAt: '2026-09-29', text: 'AL-Bild getragen' });
 		expect(p.goals[0]?.steps[1]).toMatchObject({ fokus: true, text: 'Konzept fertigstellen' });
 		expect(p.goals[0]?.steps[2]?.level).toBe(1);
+	});
+	it('reads #cd and the metric line', () => {
+		expect(p.goals[1]).toMatchObject({ name: 'Regionen anbinden', cd: true, metric: '2 Regionen produktiv' });
+		expect(p.goals[0]?.cd).toBe(false);
 	});
 	it('parses questions with kinds and persons', () => {
 		expect(p.questions.map((q) => q.kind)).toEqual(['frage', 'entscheidung', 'risiko', 'frage']);
@@ -74,7 +79,7 @@ describe('computeSignals', () => {
 		blockedBy: [],
 		returnCondition: '',
 		confidential: false,
-		goals: [{ id: `${id}.0`, name: '', implicit: true, steps: [] }],
+		goals: [{ id: `${id}.0`, name: '', implicit: true, cd: false, metric: '', steps: [] }],
 		parallel: [],
 		questions: [],
 		...extra,

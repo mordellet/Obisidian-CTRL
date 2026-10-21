@@ -60,7 +60,7 @@ export function demoData(): BoardData {
 		const leafIds: string[] = [];
 		for (let g = 0; g < t.goals; g++) {
 			const gid = `${t.id}.${g + 1}`;
-			const goal: Goal = { id: gid, name: pick(GOAL_WORDS), implicit: false, steps: [] };
+			const goal: Goal = { id: gid, name: pick(GOAL_WORDS), implicit: false, cd: g === 0, metric: '', steps: [] };
 			goals.push(goal);
 			leafIds.push(gid);
 			const ns = 2 + Math.floor(r() * 4);

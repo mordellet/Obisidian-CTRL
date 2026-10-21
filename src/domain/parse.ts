@@ -7,6 +7,8 @@ const DONE_AT = /✅\s*(\d{4}-\d{2}-\d{2})/;
 const FOKUS = /(^|\s)#fokus\b/;
 const PERSON = /@([\p{L}\p{N}_.-]+)/gu;
 const GOAL = /^###\s+(\S+)\s+(.*)$/;
+const CD = /(^|\s)#cd\b/;
+const METRIC = /^>?\s*Messung:\s*(.*)$/;
 
 type Section = 'ziele' | 'fragen' | 'parallel' | 'fokus' | 'other';
 
@@ -52,7 +54,7 @@ export function parseBody(content: string, topicId: string): ParsedBody {
 	let goal: Goal | null = null;
 	const implicit = (): Goal => {
 		if (!goal) {
-			goal = { id: `${topicId}.0`, name: 'Schritte', implicit: true, steps: [] };
+			goal = { id: `${topicId}.0`, name: 'Schritte', implicit: true, cd: false, metric: '', steps: [] };
 			goals.push(goal);
 		}
 		return goal;
@@ -68,8 +70,14 @@ export function parseBody(content: string, topicId: string): ParsedBody {
 		if (section === 'ziele') {
 			const g = GOAL.exec(line);
 			if (g) {
-				goal = { id: g[1] ?? '', name: (g[2] ?? '').trim(), implicit: false, steps: [] };
+				const name = g[2] ?? '';
+				goal = { id: g[1] ?? '', name: name.replace(CD, ' ').trim(), implicit: false, cd: CD.test(name), metric: '', steps: [] };
 				goals.push(goal);
+				continue;
+			}
+			const m = METRIC.exec(line.trim());
+			if (m && goal && !goal.implicit) {
+				goal.metric = (m[1] ?? '').trim();
 				continue;
 			}
 		}

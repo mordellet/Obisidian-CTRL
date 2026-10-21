@@ -460,8 +460,11 @@ export class CtrlView extends ItemView {
 		row('Geprüft', t.reviewed ? `vor ${daysBetween(t.reviewed, this.today)} d` : '—');
 		row('Rückführung', t.returnCondition || 'unbekannt');
 
-		for (const g of t.goals) {
-			this.section(card, g.implicit ? 'Schritte' : `${g.id} ${g.name}`);
+		const goals = [...t.goals].sort((a, b) => Number(b.cd) - Number(a.cd));
+		for (const g of goals) {
+			if (g.implicit && !g.steps.length) continue;
+			this.section(card, g.implicit ? 'Schritte' : `${g.id} ${g.name}${g.cd ? '  · cd' : ''}`);
+			if (g.metric) card.createDiv({ text: g.metric, cls: 'ctrl-metric ctrl-small' });
 			const list = card.createDiv({ cls: 'ctrl-list' });
 			for (const st of g.steps) this.stepItem(list, t.path, st);
 		}
@@ -517,6 +520,30 @@ export class CtrlView extends ItemView {
 		cnt(sigs.filter((s) => s.slop).length, 'slop');
 		cnt(sigs.filter((s) => s.stale).length, 'stale');
 		cnt(sigs.filter((s) => s.blocked).length, 'blockiert', true);
+
+		// CD-Ziele (Contribution Dialog) – Vorrang vor allem anderen
+		const cd = topics.flatMap((t) => t.goals.filter((g) => g.cd).map((g) => ({ t, g })));
+		if (cd.length) {
+			const ref = this.today;
+			this.section(card, `CD-Ziele · ${cd.length}`);
+			const cl = card.createDiv({ cls: 'ctrl-list' });
+			for (const { t, g } of cd) {
+				const done = g.steps.filter((x) => x.done).length;
+				const last = g.steps.map((x) => x.doneAt).filter((d): d is string => !!d).sort().pop();
+				const ev = (this.sig.get(t.id)?.events ?? []).filter((e) => e.goal === g.id).length;
+				const still = !last || daysBetween(last, ref) > this.staleDays;
+				const r = cl.createDiv({ cls: 'ctrl-item ctrl-cd' + (still ? ' is-still' : ''), attr: { title: g.metric } });
+				const box = r.createSpan({ cls: 'ctrl-cd-bar' });
+				box.createSpan({ cls: 'ctrl-cd-fill', attr: { style: `width:${g.steps.length ? Math.round((done / g.steps.length) * 100) : 0}%` } });
+				const tg = r.createSpan({ text: g.id, cls: 'ctrl-mono ctrl-small ctrl-link' });
+				tg.onclick = () => {
+					this.sel = t.id;
+					this.draw();
+				};
+				r.createSpan({ text: g.name, cls: 'ctrl-grow' });
+				r.createSpan({ text: `${done}/${g.steps.length}${ev ? ` · ${ev} ev` : ''}${still ? ' · still' : ''}`, cls: 'ctrl-mono ctrl-small ctrl-muted' });
+			}
+		}
 
 		// Fokus
 		const main = this.data?.main;

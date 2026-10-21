@@ -41,6 +41,10 @@ export interface Goal {
 	id: string;
 	name: string;
 	implicit: boolean;
+	/** Ziel aus dem Contribution Dialog (`#cd` an der Überschrift). */
+	cd: boolean;
+	/** Messgröße (`Messung: …` direkt unter der Überschrift). */
+	metric: string;
 	steps: Step[];
 }
 
