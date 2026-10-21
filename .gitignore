@@ -1,0 +1,29 @@
+# editors
+.vscode
+.idea
+*.iml
+
+# dependencies
+node_modules
+
+# build output (main.js goes into GitHub releases)
+main.js
+*.map
+
+# obsidian
+data.json
+
+# claude code (local settings only; .claude/skills is versioned)
+.claude/settings.local.json
+
+# macOS
+.DS_Store
+
+# e2e generated fixtures
+tests/e2e/fixtures/large-*.canvas
+tests/e2e/fixtures/large-*.filavi.json
+tests/e2e/fixtures/large-*.filavi-session.json
+
+# eval raw outputs (evaluated summary goes to specs/*/results.md)
+tests/evals/results/
+tests/e2e/fixtures/large-*.filavi/

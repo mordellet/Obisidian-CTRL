@@ -1,0 +1,9 @@
+{
+	"id": "ctrl-board",
+	"name": "CTRL",
+	"version": "0.1.0",
+	"minAppVersion": "1.13.1",
+	"description": "Personal steering board: topics, energy, progress and open questions from your notes.",
+	"author": "Sebastien Mordellet",
+	"isDesktopOnly": true
+}
