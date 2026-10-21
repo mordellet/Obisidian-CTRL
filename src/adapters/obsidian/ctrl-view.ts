@@ -101,7 +101,7 @@ export class CtrlView extends ItemView {
 		return this.demo ? this.demoService : this.live;
 	}
 	private get today(): string {
-		return this.demo ? '2026-10-21' : this.today;
+		return this.demo ? '2026-10-21' : this.clock.today();
 	}
 
 	async refresh() {
