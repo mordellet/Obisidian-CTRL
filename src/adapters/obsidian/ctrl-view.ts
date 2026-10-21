@@ -38,6 +38,16 @@ function sectorPath(r1: number, r2: number, a0: number, a1: number): string {
 	return `M${x0},${y0} A${r2},${r2} 0 ${large} 1 ${x1},${y1} L${x2},${y2} A${r1},${r1} 0 ${large} 0 ${x3},${y3} Z`;
 }
 
+function arrow(x: number, y: number, ang: number, len: number): string {
+	const a = (ang * Math.PI) / 180;
+	const ex = x + len * Math.cos(a);
+	const ey = y + len * Math.sin(a);
+	const h = 4;
+	const l = a + Math.PI * 0.8;
+	const r = a - Math.PI * 0.8;
+	return `M ${x} ${y} L ${ex} ${ey} M ${ex + h * Math.cos(l)} ${ey + h * Math.sin(l)} L ${ex} ${ey} L ${ex + h * Math.cos(r)} ${ey + h * Math.sin(r)}`;
+}
+
 function arcPath(r: number, a0: number, a1: number): string {
 	const [x0, y0] = pol(r, a0);
 	const [x1, y1] = pol(r, a1);
@@ -54,12 +64,14 @@ export class CtrlView extends ItemView {
 	private sel: string | null = null;
 	private mode: 'jahr' | '28' = 'jahr';
 	private runde = false;
+	private demo = false;
 	private hint = '';
 	private draft = '';
 
 	constructor(
 		leaf: WorkspaceLeaf,
-		private readonly service: BoardService,
+		private readonly live: BoardService,
+		private readonly demoService: BoardService,
 		private readonly clock: Clock,
 		private readonly defaultStale: () => number,
 	) {
@@ -85,6 +97,13 @@ export class CtrlView extends ItemView {
 		await this.refresh();
 	}
 
+	private get service(): BoardService {
+		return this.demo ? this.demoService : this.live;
+	}
+	private get today(): string {
+		return this.demo ? '2026-10-21' : this.today;
+	}
+
 	async refresh() {
 		try {
 			this.data = await this.service.load();
@@ -107,6 +126,7 @@ export class CtrlView extends ItemView {
 		return this.visibleTopics().find((t) => t.id === id);
 	}
 	private openNote(path: string) {
+		if (this.demo) return;
 		void this.app.workspace.openLinkText(path, '', 'tab');
 	}
 
@@ -130,7 +150,7 @@ export class CtrlView extends ItemView {
 			return;
 		}
 		const topics = this.visibleTopics();
-		this.sig = computeSignals(topics, data.events, { ref: this.clock.today(), win: this.win, staleDays: this.staleDays });
+		this.sig = computeSignals(topics, data.events, { ref: this.today, win: this.win, staleDays: this.staleDays });
 		this.renderHeader(root);
 		this.renderStatusLine(root);
 		const stage = root.createDiv({ cls: 'ctrl-stage' });
@@ -173,7 +193,14 @@ export class CtrlView extends ItemView {
 			if (this.sel && !this.topic(this.sel)) this.sel = null;
 			this.draw();
 		};
-		right.createSpan({ text: this.clock.today(), cls: 'ctrl-mono ctrl-small' });
+		const d = right.createEl('button', { text: this.demo ? 'demo · an' : 'demo · aus', cls: 'ctrl-btn' + (this.demo ? ' is-active' : '') });
+		d.onclick = () => {
+			this.demo = !this.demo;
+			this.sel = null;
+			this.hint = '';
+			void this.refresh();
+		};
+		right.createSpan({ text: this.today, cls: 'ctrl-mono ctrl-small' });
 		const re = right.createEl('button', { text: '↻', cls: 'ctrl-btn' });
 		re.onclick = () => void this.refresh();
 	}
@@ -217,14 +244,13 @@ export class CtrlView extends ItemView {
 
 	// ── radial net (Stufe 0) ───────────────────────────────
 	private renderNet(card: HTMLElement, topics: Topic[]) {
+		// geometry and encoding follow the design reference (Board Phase 5) 1:1
 		const s = svg('svg', { viewBox: '0 0 860 780', class: 'ctrl-net' }, card);
 		const defs = svg('defs', {}, s);
 		const pat = svg('pattern', { id: 'ctrl-grain', width: 4, height: 4, patternUnits: 'userSpaceOnUse' }, defs);
 		svg('circle', { cx: 2, cy: 2, r: 0.8, class: 'ctrl-grain-dot' }, pat);
-		for (const p of [0.25, 0.5, 0.75, 1]) svg('circle', { cx: C.x, cy: C.y, r: R0 + (RMAX - R0) * p, class: 'ctrl-ring' }, s);
-		svg('circle', { cx: C.x, cy: C.y, r: R0, class: 'ctrl-ring' }, s);
-
 		const n = topics.length;
+		for (const f of [0.25, 0.5, 0.75, 1]) svg('circle', { cx: C.x, cy: C.y, r: R0 + f * (RMAX - R0), class: 'ctrl-ring' }, s);
 		if (!n) {
 			const t = svg('text', { x: C.x, y: C.y, class: 'ctrl-center', 'text-anchor': 'middle' }, s);
 			t.textContent = 'Keine Themen im Board-Ordner';
@@ -232,122 +258,143 @@ export class CtrlView extends ItemView {
 		}
 		const step = 360 / n;
 		const gap = n > 8 ? 5 : 8;
-		const maxE = Math.max(1, ...topics.map((t) => this.sig.get(t.id)?.energy ?? 0));
-		const rOf = (e: number) => R0 + 14 + (RMAX - R0 - 14) * (e / maxE);
-		const byRank = new Map(topics.map((t) => [this.sig.get(t.id)?.energyRank ?? 0, this.sig.get(t.id)?.energy ?? 0]));
-		const mid = new Map(topics.map((t, i) => [t.id, i * step]));
+		const sigOf = (id: string) => this.sig.get(id) as Signals;
+		const maxE = Math.max(1, ...topics.map((t) => sigOf(t.id).energy));
+		const rOf = (e: number) => R0 + (e / maxE) * (RMAX - R0);
+		const energyByRank = [...topics].map((t) => sigOf(t.id).energy).sort((a, b) => b - a);
+		const pos = new Map(topics.map((t, i) => [t.id, i * step]));
+		const neighbours = (id: string) => {
+			const t = topics.find((x) => x.id === id);
+			return new Set([id, ...(t?.needs ?? []), ...(t?.blockedBy ?? []), ...topics.filter((x) => x.needs.includes(id) || x.blockedBy.includes(id)).map((x) => x.id)]);
+		};
 
-		// dependencies (under sectors)
-		const depG = svg('g', { class: 'ctrl-deps' }, s);
-		for (const t of topics) {
-			for (const need of new Set([...t.needs, ...t.blockedBy])) {
-				const a = mid.get(need);
-				const b = mid.get(t.id);
-				if (a === undefined || b === undefined) continue;
-				const [x0, y0] = pol(R0, a);
-				const [x1, y1] = pol(R0, b);
-				const blocked = t.blockedBy.includes(need);
-				svg('path', { d: `M${x0},${y0} Q${C.x},${C.y} ${x1},${y1}`, class: 'ctrl-dep' + (blocked ? ' is-blocked' : ''), 'data-from': need, 'data-to': t.id }, depG);
-				svg('circle', { cx: x1, cy: y1, r: 2.4, class: 'ctrl-dep-end' + (blocked ? ' is-blocked' : '') }, depG);
-			}
-		}
+		const hitG = svg('g', {}, s);
+		const depG = svg('g', {}, s);
+		const bodyG = svg('g', {}, s);
+		const labelG = svg('g', {}, s);
+		const groups = new Map<string, SVGElement[]>();
+		const add = (id: string, e: SVGElement) => {
+			const l = groups.get(id) ?? [];
+			l.push(e);
+			groups.set(id, l);
+			return e;
+		};
 
-		const groups: SVGGElement[] = [];
 		topics.forEach((t, i) => {
-			const sg = this.sig.get(t.id);
-			if (!sg) return;
-			const m = i * step;
-			const a0 = m - step / 2 + gap / 2;
-			const a1 = m + step / 2 - gap / 2;
-			const rE = rOf(sg.energy);
-			const g = svg('g', { class: 'ctrl-sector' + (this.sel === t.id ? ' is-selected' : '') + (sg.stale ? ' is-stale' : ''), 'data-id': t.id }, s);
-			groups.push(g);
-			svg('path', { d: sectorPath(R0, rE, a0, a1), class: 'ctrl-sector-fill' }, g);
+			const k = sigOf(t.id);
+			const ang = i * step;
+			const a0 = ang - step / 2 + gap / 2;
+			const a1 = ang + step / 2 - gap / 2;
+			const rE = rOf(k.energy);
+			const g = add(t.id, svg('g', { class: 'ctrl-sector' + (k.stale ? ' is-stale' : '') + (this.sel === t.id ? ' is-selected' : '') }, bodyG));
+			const outline = k.blocked ? 'is-blocked' : k.stale ? 'is-stale' : '';
+			svg('path', { d: sectorPath(R0, rE, a0, a1), class: 'ctrl-sector-fill ctrl-outline ' + outline }, g);
 
-			// slices per goal (only explicit goals)
-			const goals = t.goals.filter((x) => !x.implicit);
-			const parts: { a0: number; a1: number; progress: number }[] = [];
-			if (goals.length > 1) {
-				const w = goals.map((go) => {
-					const e = sg.events.filter((ev) => ev.goal === go.id).length;
-					return e || go.steps.length || 1;
+			// slices = goals: width = 8 % minimum + rest proportional to goal energy
+			const goals = t.goals.filter((x) => x.steps.length || !x.implicit);
+			const ge = goals.map((go) => k.events.filter((e) => e.goal === go.id).reduce((a, e) => a + e.conf, 0));
+			const ssum = ge.reduce((a, b) => a + b, 0) || 1;
+			const span = a1 - a0;
+			const minW = goals.length ? span * 0.08 : 0;
+			const free = span - minW * goals.length;
+			let ga = a0;
+			const bounds: number[] = [];
+			goals.forEach((go, j) => {
+				const gw = minW + (free * (ge[j] ?? 0)) / ssum;
+				const done = go.steps.filter((x) => x.done).length;
+				const pr = go.steps.length ? done / go.steps.length : 0;
+				if (pr > 0 && rE > R0 + 1) svg('path', { d: sectorPath(R0, R0 + (rE - R0) * pr, ga + 0.6, ga + gw - 0.6), class: 'ctrl-progress' }, g);
+				// step dots in the core on hover / selection (● done, ○ open)
+				const dots = svg('g', { class: 'ctrl-dots' }, g);
+				go.steps.slice(0, 9).forEach((st, q) => {
+					const [x, y] = pol(R0 + 7 + q * 8, ga + gw / 2);
+					svg('circle', { cx: x, cy: y, r: 2.4, class: 'ctrl-dot' + (st.done ? ' is-done' : '') }, dots);
 				});
-				const sum = w.reduce((x, y) => x + y, 0);
-				const span = a1 - a0;
-				const min = span * 0.08;
-				const rest = span - min * goals.length;
-				let cur = a0;
-				goals.forEach((go, k) => {
-					const width = min + (rest * (w[k] ?? 0)) / sum;
-					const done = go.steps.filter((x) => x.done).length;
-					parts.push({ a0: cur, a1: cur + width, progress: go.steps.length ? done / go.steps.length : 0 });
-					cur += width;
-				});
-			} else parts.push({ a0, a1, progress: sg.progress });
-			for (const p of parts) {
-				if (p.progress > 0) svg('path', { d: sectorPath(R0, R0 + (rE - R0) * p.progress, p.a0, p.a1), class: 'ctrl-progress' }, g);
+				ga += gw;
+				bounds.push(ga);
+			});
+			for (const b of bounds.slice(0, -1)) {
+				const [x1, y1] = pol(R0, b);
+				const [x2, y2] = pol(Math.max(rE, R0 + 2), b);
+				svg('line', { x1, y1, x2, y2, class: 'ctrl-slice-sep' }, g);
 			}
-			for (const p of parts.slice(1)) {
-				const [x0, y0] = pol(R0, p.a0);
-				const [x1, y1] = pol(rE, p.a0);
-				svg('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'ctrl-slice-sep' }, g);
-			}
-			if (sg.slop) svg('path', { d: sectorPath(R0, rE, a0, a1), fill: 'url(#ctrl-grain)', class: 'ctrl-slop' }, g);
-			svg('path', { d: sectorPath(R0, rE, a0, a1), class: 'ctrl-outline' + (sg.blocked ? ' is-blocked' : '') }, g);
+			if (k.slop) svg('path', { d: sectorPath(R0, rE, a0, a1), fill: 'url(#ctrl-grain)' }, g);
 
-			// Soll-Marke + Δ
-			if (sg.misalloc !== 0) {
-				const rS = rOf(byRank.get(t.prio) ?? 0);
-				svg('path', { d: arcPath(rS, a0 + 1, a1 - 1), class: 'ctrl-soll' }, g);
-				if (sg.misallocFlag) {
-					const [x, y] = pol(Math.max(rS, rE) + 12, m + 7);
-					const tx = svg('text', { x, y, class: 'ctrl-delta', 'text-anchor': 'middle' }, g);
-					tx.textContent = sg.misalloc > 0 ? `▲ +${sg.misalloc}` : `▼ ${sg.misalloc}`;
-				}
+			// Soll-Marke + Δ (only when flagged, as in the design)
+			if (k.misallocFlag) {
+				const rS = rOf(energyByRank[t.prio - 1] ?? 0);
+				svg('path', { d: arcPath(rS, a0, a1), class: 'ctrl-soll' }, g);
+				const [lx, ly] = pol(Math.max(rS, rE) + 12, ang + 7);
+				const tx = svg('text', { x: lx, y: ly + 3, class: 'ctrl-delta', 'text-anchor': 'middle' }, g);
+				tx.textContent = (k.misalloc > 0 ? '▲ +' : '▼ ') + String(k.misalloc);
 			}
 			// direction
-			if (Math.abs(sg.trend) < 0.12) {
-				const [x0, y0] = pol(rE + 6, m - 2);
-				const [x1, y1] = pol(rE + 6, m + 2);
-				svg('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'ctrl-trend' }, g);
-			} else {
-				const len = 6 + 12 * Math.abs(sg.trend);
-				const from = sg.trend > 0 ? rE + 4 : rE + 4 + len;
-				const to = sg.trend > 0 ? rE + 4 + len : rE + 4;
-				const [x0, y0] = pol(from, m);
-				const [x1, y1] = pol(to, m);
-				const [hx0, hy0] = pol(to + (sg.trend > 0 ? -4 : 4), m - 1.5);
-				const [hx1, hy1] = pol(to + (sg.trend > 0 ? -4 : 4), m + 1.5);
-				svg('path', { d: `M${x0},${y0} L${x1},${y1} M${hx0},${hy0} L${x1},${y1} L${hx1},${hy1}`, class: 'ctrl-trend' }, g);
-			}
-			// label
-			const [lx, ly] = pol(RMAX + 30, m);
-			const anchor = Math.abs(lx - C.x) < 8 ? 'middle' : lx > C.x ? 'start' : 'end';
-			const label = svg('text', { x: lx, y: ly + 4, class: 'ctrl-label' + (sg.stale ? ' is-stale' : ''), 'text-anchor': anchor }, g);
-			const idSpan = svg('tspan', { class: 'ctrl-label-id' }, label);
-			idSpan.textContent = `${t.id}  `;
-			const nm = svg('tspan', {}, label);
-			nm.textContent = short(t.name, 26) + (t.status.kw !== 'läuft' ? ` · ${t.status.kw}` : '');
-			const flags = [sg.blocked ? 'blockiert' : '', sg.slop ? 'slop' : '', sg.stale ? 'stale' : '', t.confidential ? 'vertraulich' : ''].filter(Boolean);
-			if (flags.length) {
-				const fl = svg('text', { x: lx, y: ly + 17, class: 'ctrl-label-flags' + (sg.blocked ? ' is-blocked' : ''), 'text-anchor': anchor }, g);
-				fl.textContent = flags.join(' · ');
-			}
-			// hit area
-			const hit = svg('path', { d: sectorPath(R0, RMAX + 20, a0, a1), class: 'ctrl-hit' }, g);
+			const [tx, ty] = pol(rE + (k.misallocFlag ? 22 : 6), ang);
+			if (Math.abs(k.trend) < 0.12) svg('path', { d: `M ${tx} ${ty} m -3 0 l 6 0`, class: 'ctrl-trend is-flat' }, g);
+			else svg('path', { d: arrow(tx, ty, ang - 90 + (k.trend > 0 ? 0 : 180), 6 + 12 * Math.abs(k.trend)), class: 'ctrl-trend' }, g);
+
+			// radial label, mirrored on the left half
+			const flip = ang > 180 && ang < 360;
+			const [lx, ly] = pol(RMAX + 14, ang);
+			const label = add(
+				t.id,
+				svg('text', { x: lx, y: ly + 3, class: 'ctrl-label' + (k.stale ? ' is-stale' : ''), 'text-anchor': flip ? 'end' : 'start', transform: `rotate(${flip ? ang + 90 : ang - 90} ${lx} ${ly})` }, labelG),
+			);
+			const kw = t.status.kw !== 'läuft' ? ` · ${t.status.kw}` : '';
+			label.textContent = `${t.id}  ${short(t.name, 26)}${kw}`;
+
+			const hit = svg('path', { d: sectorPath(R0, RMAX + 130, a0, a1), class: 'ctrl-hit' }, hitG);
 			hit.onclick = () => {
 				this.sel = this.sel === t.id ? null : t.id;
 				this.draw();
 			};
 			hit.ondblclick = () => this.openNote(t.path);
-			const related = new Set([t.id, ...t.needs, ...t.blockedBy, ...topics.filter((x) => x.needs.includes(t.id) || x.blockedBy.includes(t.id)).map((x) => x.id)]);
 			hit.onmouseenter = () => {
+				const rel = neighbours(t.id);
 				s.addClass('has-hover');
-				for (const gg of groups) gg.toggleClass('is-related', related.has(gg.getAttribute('data-id') ?? ''));
-				depG.querySelectorAll('.ctrl-dep').forEach((d) => d.toggleClass('is-related', d.getAttribute('data-from') === t.id || d.getAttribute('data-to') === t.id));
+				g.addClass('is-hover');
+				for (const [id, els] of groups) for (const e of els) e.toggleClass('is-related', rel.has(id));
+				depG.querySelectorAll('[data-a]').forEach((d) => {
+					const on = d.getAttribute('data-a') === t.id || d.getAttribute('data-b') === t.id;
+					d.toggleClass('is-related', on);
+				});
 			};
-			hit.onmouseleave = () => s.removeClass('has-hover');
+			hit.onmouseleave = () => {
+				s.removeClass('has-hover');
+				g.removeClass('is-hover');
+			};
 		});
+
+		// dependencies: hairline through the core; full band with arrow on hover
+		for (const t of topics) {
+			for (const from of new Set([...t.needs, ...t.blockedBy])) {
+				const a = pos.get(from);
+				const b = pos.get(t.id);
+				if (a === undefined || b === undefined) continue;
+				const supplier = topics.find((x) => x.id === from);
+				const open = !supplier || supplier.status.kw !== 'fertig';
+				const blk = t.blockedBy.includes(from) && open;
+				const rr = R0 - 2;
+				const [ax, ay] = pol(rr, a);
+				const [bx, by] = pol(rr, b);
+				const cls = (blk ? ' is-blocked' : '') + (open ? '' : ' is-closed');
+				const line = svg('path', { d: `M ${ax} ${ay} Q ${C.x} ${C.y} ${bx} ${by}`, class: 'ctrl-dep' + cls, 'data-a': from, 'data-b': t.id }, depG);
+				line.onclick = () => {
+					this.sel = from;
+					this.draw();
+				};
+				const w = 3;
+				const [a0x, a0y] = pol(rr, a - w);
+				const [a1x, a1y] = pol(rr, a + w);
+				const [b0x, b0y] = pol(rr, b - w);
+				const [b1x, b1y] = pol(rr, b + w);
+				const band = `M ${a0x} ${a0y} A ${rr} ${rr} 0 0 1 ${a1x} ${a1y} Q ${C.x} ${C.y} ${b0x} ${b0y} A ${rr} ${rr} 0 0 1 ${b1x} ${b1y} Q ${C.x} ${C.y} ${a0x} ${a0y} Z`;
+				svg('path', { d: band, class: 'ctrl-dep-band' + cls, 'data-a': from, 'data-b': t.id }, depG);
+				const mx = ((ax + bx) / 2) * 0.5 + C.x * 0.5;
+				const my = ((ay + by) / 2) * 0.5 + C.y * 0.5;
+				svg('path', { d: arrow(mx, my, (Math.atan2(by - my, bx - mx) * 180) / Math.PI, 8), class: 'ctrl-dep-arrow' + cls, 'data-a': from, 'data-b': t.id }, depG);
+			}
+		}
 
 		const evs = this.windowEvents();
 		const c1 = svg('text', { x: C.x, y: C.y - 2, class: 'ctrl-center', 'text-anchor': 'middle' }, s);
@@ -355,14 +402,15 @@ export class CtrlView extends ItemView {
 		const c2 = svg('text', { x: C.x, y: C.y + 12, class: 'ctrl-center ctrl-center-2', 'text-anchor': 'middle' }, s);
 		c2.textContent = `${evs.filter((e) => !e.topic).length} nicht zugeordnet`;
 
-		const legend = card.createDiv({ cls: 'ctrl-legend ctrl-mono' });
-		legend.createDiv({ text: 'radius = energie (notizen mit thema/link im fenster) · füllung = fortschritt · bogen = soll laut priorität · pfeil = richtung' });
-		legend.createDiv({ text: 'gepunktet = stale · körnung = slop (aktivität ohne fortschritt) · farbe = nur blockiert' });
-		legend.createDiv({ text: 'klick = detail · doppelklick = notiz öffnen · esc = übersicht' });
+		const foot = card.createDiv({ cls: 'ctrl-legend ctrl-mono' });
+		const legend = foot.createDiv();
+		legend.createDiv({ text: 'radius = energie · slice = ziel (breite = anteil, füllung = fortschritt)' });
+		legend.createDiv({ text: '▮ soll-marke + Δ = fehlallokation · pfeil = richtung · körnung = slop' });
+		legend.createDiv({ text: 'gepunktet + blass = stale · farbe = nur blockiert' });
+		foot.createDiv({ text: 'klick = detail · doppelklick = notiz · esc = übersicht', cls: 'ctrl-gesture' });
 	}
-
 	private windowEvents(): BoardEvent[] {
-		const ref = this.clock.today();
+		const ref = this.today;
 		return (this.data?.events ?? []).filter((e) => {
 			const d = daysBetween(e.at, ref);
 			return d >= 0 && d < this.win;
@@ -409,7 +457,7 @@ export class CtrlView extends ItemView {
 		row('Fortschritt', `${sg.done}/${sg.total} · ${Math.round(sg.progress * 100)} %`);
 		row('Letzter Fortschritt', sg.staleDays === null ? 'nie datiert' : `vor ${sg.staleDays} d`);
 		row('Priorität · Energie-Rang', `${t.prio} · ${sg.energyRank}`);
-		row('Geprüft', t.reviewed ? `vor ${daysBetween(t.reviewed, this.clock.today())} d` : '—');
+		row('Geprüft', t.reviewed ? `vor ${daysBetween(t.reviewed, this.today)} d` : '—');
 		row('Rückführung', t.returnCondition || 'unbekannt');
 
 		for (const g of t.goals) {

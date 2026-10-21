@@ -4,6 +4,7 @@ import { CtrlView, VIEW_TYPE_CTRL } from './adapters/obsidian/ctrl-view';
 import { CtrlSettingTab, DEFAULT_SETTINGS, type CtrlSettings, type SettingsHost } from './adapters/obsidian/settings';
 import { VaultBoardSource } from './adapters/obsidian/vault-source';
 import { SystemClock, VaultBoardWriter } from './adapters/obsidian/vault-writer';
+import { DemoSource, ReadOnlyWriter } from './adapters/demo/demo-source';
 
 // Composition root: wires adapters to ports. No domain logic here.
 export default class CtrlPlugin extends Plugin implements SettingsHost {
@@ -14,7 +15,8 @@ export default class CtrlPlugin extends Plugin implements SettingsHost {
 		this.addSettingTab(new CtrlSettingTab(this.app, this));
 		const clock = new SystemClock();
 		const service = new BoardService(new VaultBoardSource(this.app, () => this.settings), new VaultBoardWriter(this.app), clock);
-		this.registerView(VIEW_TYPE_CTRL, (leaf) => new CtrlView(leaf, service, clock, () => this.settings.staleDays));
+		const demo = new BoardService(new DemoSource(), new ReadOnlyWriter(), clock);
+		this.registerView(VIEW_TYPE_CTRL, (leaf) => new CtrlView(leaf, service, demo, clock, () => this.settings.staleDays));
 		this.addRibbonIcon('radar', 'Open CTRL board', () => void this.activate());
 		this.addCommand({ id: 'open', name: 'Open board', callback: () => void this.activate() });
 

@@ -1,16 +1,18 @@
-/* CTRL — scoped under .ctrl; Obsidian variables only, plus the energy tone (Exocephalon). */
+/* CTRL — scoped under .ctrl; Exocephalon tokens (design system of the handoff). */
 .ctrl {
+	--ach-50: #121110; --ach-100: #1a1816; --ach-200: #24211e; --ach-300: #322e2a; --ach-400: #4a4540;
+	--ach-500: #6b6560; --ach-600: #8e8780; --ach-700: #b3aca3; --ach-800: #d6d0c7; --ach-900: #ebe6dd; --ach-1000: #f7f3ec;
+	--ctrl-surface-base: var(--ach-50);
+	--ctrl-surface-raised: var(--ach-100);
+	--ctrl-surface-overlay: var(--ach-200);
+	--ctrl-hairline: var(--ach-300);
+	--ctrl-strong: var(--ach-400);
+	--ctrl-fg: var(--ach-800);
+	--ctrl-fg-2: var(--ach-600);
+	--ctrl-fg-3: var(--ach-500);
 	--ctrl-energy: #ffb454;
 	--ctrl-energy-glow: rgba(255, 180, 84, 0.18);
-	--ctrl-surface-base: var(--background-primary);
-	--ctrl-surface-raised: var(--background-secondary);
-	--ctrl-surface-overlay: var(--background-modifier-hover);
-	--ctrl-fg: var(--text-normal);
-	--ctrl-fg-2: var(--text-muted);
-	--ctrl-fg-3: var(--text-faint);
-	--ctrl-hairline: var(--background-modifier-border);
-	--ctrl-strong: var(--text-faint);
-	--ctrl-mono: var(--font-monospace);
+	--ctrl-mono: 'JetBrains Mono', var(--font-monospace);
 	--ctrl-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 	padding: 12px 16px 24px !important;
 	display: flex;
@@ -23,8 +25,16 @@
 	background: var(--ctrl-surface-base);
 }
 .theme-light .ctrl {
+	--ctrl-surface-base: var(--ach-1000);
+	--ctrl-surface-raised: var(--ach-900);
+	--ctrl-surface-overlay: var(--ach-800);
+	--ctrl-hairline: var(--ach-800);
+	--ctrl-strong: var(--ach-700);
+	--ctrl-fg: var(--ach-100);
+	--ctrl-fg-2: var(--ach-300);
+	--ctrl-fg-3: var(--ach-500);
 	--ctrl-energy: #b8721c;
-	--ctrl-energy-glow: rgba(184, 114, 28, 0.15);
+	--ctrl-energy-glow: rgba(184, 114, 28, 0.14);
 }
 .ctrl .ctrl-mono { font-family: var(--ctrl-mono); font-variant-numeric: tabular-nums; }
 .ctrl .ctrl-small { font-size: 10px; }
@@ -75,37 +85,47 @@
 .ctrl .ctrl-detail { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; max-height: 860px; overflow-y: auto; }
 .ctrl .ctrl-legend { border-top: 1px solid var(--ctrl-hairline); padding-top: 6px; font-size: 10px; color: var(--ctrl-fg-3); }
 
-/* net */
+/* net — encoding as in the design reference */
 .ctrl svg.ctrl-net { width: 100%; height: auto; display: block; }
 .ctrl .ctrl-ring { fill: none; stroke: var(--ctrl-hairline); stroke-dasharray: 1 3; }
-.ctrl .ctrl-sector { transition: opacity 200ms var(--ctrl-ease); }
-.ctrl .has-hover .ctrl-sector:not(.is-related) { opacity: 0.3; }
-.ctrl .has-hover .ctrl-dep:not(.is-related) { opacity: 0.2; }
+.ctrl .ctrl-sector, .ctrl .ctrl-label, .ctrl .ctrl-dep, .ctrl .ctrl-dep-band, .ctrl .ctrl-dep-arrow { transition: opacity 200ms var(--ctrl-ease); }
+.ctrl .ctrl-sector.is-stale { opacity: 0.4; }
+.ctrl .has-hover .ctrl-sector:not(.is-related), .ctrl .has-hover .ctrl-label:not(.is-related) { opacity: 0.3; }
 .ctrl .ctrl-sector-fill { fill: var(--ctrl-surface-overlay); }
-.ctrl .ctrl-progress { fill: var(--ctrl-strong); opacity: 0.55; }
+.ctrl .ctrl-outline { stroke: var(--ctrl-strong); stroke-width: 1; }
+.ctrl .ctrl-outline.is-stale { stroke: var(--ctrl-fg-3); stroke-dasharray: 2 2; }
+.ctrl .ctrl-outline.is-blocked { stroke: var(--ctrl-energy); stroke-width: 1.5; }
+.ctrl .is-selected .ctrl-outline:not(.is-blocked) { stroke: var(--ctrl-fg); }
+.ctrl .ctrl-progress { fill: var(--ctrl-strong); }
 .ctrl .ctrl-slice-sep { stroke: var(--ctrl-surface-raised); stroke-width: 1.2; }
 .ctrl .ctrl-grain-dot { fill: var(--ctrl-fg-2); }
-.ctrl .ctrl-outline { fill: none; stroke: var(--ctrl-strong); stroke-width: 1; }
-.ctrl .is-stale .ctrl-outline { stroke: var(--ctrl-fg-3); stroke-dasharray: 2 2; }
-.ctrl .is-stale .ctrl-sector-fill,
-.ctrl .is-stale .ctrl-progress { opacity: 0.4; }
-.ctrl .ctrl-outline.is-blocked { stroke: var(--ctrl-energy); stroke-width: 1.5; stroke-dasharray: none; }
-.ctrl .is-selected .ctrl-outline { stroke: var(--ctrl-fg); stroke-width: 1.5; }
 .ctrl .ctrl-soll { fill: none; stroke: var(--ctrl-fg); stroke-width: 3; }
 .ctrl .ctrl-delta { font-family: var(--ctrl-mono); font-size: 10px; font-weight: 600; fill: var(--ctrl-fg); }
-.ctrl .ctrl-trend { fill: none; stroke: var(--ctrl-fg-2); stroke-width: 1.2; }
-.ctrl .ctrl-label { font-size: 11px; fill: var(--ctrl-fg); }
+.ctrl .ctrl-trend { fill: none; stroke: var(--ctrl-fg); stroke-width: 1.2; }
+.ctrl .ctrl-trend.is-flat { stroke: var(--ctrl-fg-2); stroke-width: 1.5; }
+.ctrl .ctrl-dots { display: none; }
+.ctrl .is-hover .ctrl-dots, .ctrl .is-selected .ctrl-dots { display: inline; }
+.ctrl .ctrl-dot { fill: var(--ctrl-surface-base); stroke: var(--ctrl-fg); stroke-width: 1; }
+.ctrl .ctrl-dot.is-done { fill: var(--ctrl-fg); }
+.ctrl .ctrl-label { font-size: 11px; fill: var(--ctrl-fg); pointer-events: none; }
 .ctrl .ctrl-label.is-stale { fill: var(--ctrl-fg-3); }
-.ctrl .ctrl-label-id { font-family: var(--ctrl-mono); fill: var(--ctrl-fg-3); }
-.ctrl .ctrl-label-flags { font-family: var(--ctrl-mono); font-size: 9px; font-weight: 600; fill: var(--ctrl-fg-3); }
-.ctrl .ctrl-label-flags.is-blocked { fill: var(--ctrl-energy); }
 .ctrl .ctrl-hit { fill: transparent; cursor: pointer; }
-.ctrl .ctrl-dep { fill: none; stroke: var(--ctrl-hairline); stroke-width: 1; transition: opacity 200ms var(--ctrl-ease); }
+.ctrl .ctrl-dep { fill: none; stroke: var(--ctrl-hairline); stroke-width: 1; cursor: pointer; }
+.ctrl .ctrl-dep.is-closed { stroke-dasharray: 1 3; opacity: 0.6; }
 .ctrl .ctrl-dep.is-blocked { stroke: var(--ctrl-energy); stroke-width: 1.5; }
-.ctrl .ctrl-dep-end { fill: var(--ctrl-fg-3); }
-.ctrl .ctrl-dep-end.is-blocked { fill: var(--ctrl-energy); }
+.ctrl .ctrl-dep-band, .ctrl .ctrl-dep-arrow { display: none; pointer-events: none; }
+.ctrl .ctrl-dep-band { fill: var(--ctrl-surface-overlay); stroke: var(--ctrl-strong); stroke-dasharray: 2 2; }
+.ctrl .ctrl-dep-band.is-blocked { fill: var(--ctrl-energy-glow); stroke: var(--ctrl-energy); stroke-dasharray: none; }
+.ctrl .ctrl-dep-band.is-closed { stroke-dasharray: none; }
+.ctrl .ctrl-dep-arrow { fill: none; stroke: var(--ctrl-fg-2); stroke-width: 1.2; }
+.ctrl .ctrl-dep-arrow.is-blocked { stroke: var(--ctrl-energy); }
+.ctrl .has-hover .ctrl-dep:not(.is-related) { opacity: 0.2; }
+.ctrl .has-hover .ctrl-dep.is-related { display: none; }
+.ctrl .has-hover .ctrl-dep-band.is-related, .ctrl .has-hover .ctrl-dep-arrow.is-related { display: inline; }
 .ctrl .ctrl-center { font-family: var(--ctrl-mono); font-size: 9px; fill: var(--ctrl-fg-3); }
 .ctrl .ctrl-center-2 { fill: var(--ctrl-fg-2); }
+.ctrl .ctrl-legend { display: flex; justify-content: space-between; gap: 12px; }
+.ctrl .ctrl-gesture { text-align: right; }
 
 /* detail */
 .ctrl .ctrl-detail-head { display: flex; justify-content: space-between; gap: 8px; }

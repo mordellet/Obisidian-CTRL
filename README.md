@@ -19,6 +19,7 @@ Fortschritt, Blockaden, Fokus und offene Fragen – direkt aus dem Vault.
   Pfeil = Richtung, gepunktet = stale, Körnung = Slop, Farbe nur für Blockade.
 - Detail-Karte (Thema) bzw. Übersicht mit **Fokus** und **Zu klären**.
 - Statuszeile: `[ID] [kw:] ein Satz` + Enter. Runde-Modus blendet `confidential` aus.
+- Demo-Modus (Knopf „demo") lädt die Testdaten des Design-Handoffs (read-only) zum Vergleich.
 - Noch nicht umgesetzt: Stufe 1 (Explosion), Stufe 2 (Graph), Zeitreihe/Play.
 
 ## Entwicklung
