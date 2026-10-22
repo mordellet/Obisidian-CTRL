@@ -305,9 +305,13 @@ export class CtrlView extends ItemView {
 				const pr = go.steps.length ? done / go.steps.length : 0;
 				if (pr > 0 && rE > R0 + 1) svg('path', { d: sectorPath(R0, R0 + (rE - R0) * pr, ga + 0.6, ga + gw - 0.6), class: 'ctrl-progress' }, g);
 				// step dots in the core on hover / selection (● done, ○ open)
+				// dots: evenly spaced lanes (not energy width) and pushed outwards until lanes are ≥ 8 px apart
 				const dots = svg('g', { class: 'ctrl-dots' }, g);
+				const lane = span / goals.length;
+				const laneAng = a0 + (j + 0.5) * lane;
+				const rStart = Math.max(R0 + 7, 8 / ((lane * Math.PI) / 180));
 				go.steps.slice(0, 9).forEach((st, q) => {
-					const [x, y] = pol(R0 + 7 + q * 8, ga + gw / 2);
+					const [x, y] = pol(rStart + q * 8, laneAng);
 					svg('circle', { cx: x, cy: y, r: 2.4, class: 'ctrl-dot' + (st.done ? ' is-done' : '') }, dots);
 				});
 				ga += gw;
