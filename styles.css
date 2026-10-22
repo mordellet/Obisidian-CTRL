@@ -201,3 +201,6 @@
 .ctrl .ctrl-port { stroke: var(--ctrl-strong); }
 .ctrl .ctrl-port.is-blocked { stroke: var(--ctrl-energy); stroke-width: 1.5; }
 .ctrl .ctrl-port-label { font-family: var(--ctrl-mono); font-size: 8px; fill: var(--ctrl-fg-2); }
+
+/* hit wedges lie on top; visual layers never swallow the pointer */
+.ctrl .ctrl-body, .ctrl .ctrl-label { pointer-events: none; }

@@ -327,10 +327,10 @@ export class CtrlView extends ItemView {
 		const exploded = this.stage === 1 ? this.pin : null;
 		if (exploded) s.addClass('is-exploded');
 		const camG = svg('g', { class: 'ctrl-cam' }, s);
-		const hitG = svg('g', {}, camG);
 		const depG = svg('g', {}, camG);
-		const bodyG = svg('g', {}, camG);
+		const bodyG = svg('g', { class: 'ctrl-body' }, camG);
 		const labelG = svg('g', {}, camG);
+		const hitG = svg('g', {}, camG);
 		let hovered: string | null = null;
 		s.addEventListener('wheel', (e) => this.onWheel(e, () => hovered), { passive: false });
 		const groups = new Map<string, SVGElement[]>();
@@ -428,7 +428,9 @@ export class CtrlView extends ItemView {
 
 			// radial label, mirrored on the left half
 			const flip = ang > 180 && ang < 360;
-			const [lx, ly] = pol(ex ? Math.max(RMAX + 30, rowEnd + 14) : RMAX + 14, ang);
+			// label starts beyond arrow and Δ so a radial arrow never runs through the text
+			const arrowEnd = rE + (k.misallocFlag ? 22 : 6) + 6 + 12 * Math.abs(k.trend) + 6;
+			const [lx, ly] = pol(ex ? Math.max(RMAX + 30, rowEnd + 14) : Math.max(RMAX + 14, arrowEnd), ang);
 			const label = add(
 				t.id,
 				svg('text', { x: lx, y: ly + 3, class: 'ctrl-label' + (k.stale ? ' is-stale' : '') + dim, 'text-anchor': flip ? 'end' : 'start', transform: `rotate(${flip ? ang + 90 : ang - 90} ${lx} ${ly})` }, labelG),
@@ -694,7 +696,7 @@ export class CtrlView extends ItemView {
 		if (!sg) return;
 		const head = card.createDiv({ cls: 'ctrl-detail-head' });
 		head.createSpan({ text: `${t.id} · thema`, cls: 'ctrl-mono ctrl-small ctrl-muted' });
-		const flags = [sg.blocked ? 'blockiert' : '', sg.slop ? 'slop' : '', sg.stale ? 'stale' : '', sg.misallocFlag ? `Δ ${sg.misalloc > 0 ? '+' : ''}${sg.misalloc}` : '', t.confidential ? 'vertraulich' : '']
+		const flags = [sg.blocked ? 'blockiert' : '', sg.slop ? 'slop' : '', sg.stale ? 'stale' : '', sg.misallocFlag ? `Δ ${sg.misalloc > 0 ? '+' : ''}${sg.misalloc}` : '']
 			.filter(Boolean)
 			.join(' · ');
 		head.createSpan({ text: flags, cls: 'ctrl-mono ctrl-small' + (sg.blocked ? ' ctrl-energy' : ' ctrl-muted') });
