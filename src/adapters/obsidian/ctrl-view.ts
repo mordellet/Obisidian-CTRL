@@ -1,6 +1,6 @@
 // Board view (Stufe 0 radial + Detail + Statuszeile + Nicht zugeordnet).
 import { ItemView, Notice, type WorkspaceLeaf } from 'obsidian';
-import { daysBetween } from '../../domain/dates';
+import { addDays, daysBetween } from '../../domain/dates';
 import type { BoardData, BoardEvent, Question, Step, Topic } from '../../domain/model';
 import { STATUS_KWS } from '../../domain/model';
 import { allSteps, chain, computeSignals, type Signals } from '../../domain/signals';
@@ -67,6 +67,13 @@ export class CtrlView extends ItemView {
 	private demo = false;
 	private hint = '';
 	private draft = '';
+	/** Zoom: stage 0 = Übersicht, 1 = Explosion (pin), focus = Stufe 2 Graph. */
+	private stage: 0 | 1 = 0;
+	private pin: string | null = null;
+	private focus: string | null = null;
+	private acc = 0;
+	private lock = 0;
+	private cam = 'translate(0px, 0px) scale(1)';
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -90,8 +97,7 @@ export class CtrlView extends ItemView {
 
 	async onOpen() {
 		this.scope?.register([], 'Escape', () => {
-			this.sel = null;
-			this.draw();
+			this.back();
 			return false;
 		});
 		await this.refresh();
@@ -140,6 +146,47 @@ export class CtrlView extends ItemView {
 		await this.refresh();
 	}
 
+	/** Esc / Rad heraus: eine Stufe zurück. */
+	private back() {
+		if (this.focus) {
+			this.pin = this.focus;
+			this.stage = 1;
+			this.focus = null;
+		} else if (this.stage === 1) {
+			this.stage = 0;
+			this.pin = null;
+		} else this.sel = null;
+		this.draw();
+	}
+
+	private deeper(id: string | null) {
+		if (this.focus) return;
+		if (this.stage === 0 && id) {
+			this.stage = 1;
+			this.pin = id;
+			this.sel = id;
+		} else if (this.stage === 1 && this.pin) {
+			this.focus = this.pin;
+			this.sel = this.pin;
+			this.stage = 0;
+			this.pin = null;
+		}
+		this.draw();
+	}
+
+	private onWheel(e: WheelEvent, over: () => string | null) {
+		e.preventDefault();
+		const now = Date.now();
+		if (now < this.lock) return;
+		this.acc += e.deltaY * (e.ctrlKey ? 5 : 1);
+		if (Math.abs(this.acc) < 90) return;
+		const dir = this.acc;
+		this.acc = 0;
+		this.lock = now + 450;
+		if (dir < 0) this.deeper(over() ?? this.sel);
+		else if (this.focus || this.stage === 1) this.back();
+	}
+
 	draw() {
 		const root = this.contentEl;
 		root.empty();
@@ -154,7 +201,13 @@ export class CtrlView extends ItemView {
 		this.renderHeader(root);
 		this.renderStatusLine(root);
 		const stage = root.createDiv({ cls: 'ctrl-stage' });
-		this.renderNet(stage.createDiv({ cls: 'ctrl-card ctrl-net-card' }), topics);
+		const netCard = stage.createDiv({ cls: 'ctrl-card ctrl-net-card' });
+		const focusTopic = this.topic(this.focus);
+		if (focusTopic) this.renderGraph(netCard, focusTopic, topics);
+		else {
+			this.focus = null;
+			this.renderNet(netCard, topics);
+		}
 		this.renderDetail(stage.createDiv({ cls: 'ctrl-card ctrl-detail' }), topics);
 		this.renderUnassigned(root);
 	}
@@ -163,16 +216,19 @@ export class CtrlView extends ItemView {
 	private renderHeader(root: HTMLElement) {
 		const h = root.createDiv({ cls: 'ctrl-head' });
 		const crumbs = h.createDiv({ cls: 'ctrl-crumbs' });
-		const t = this.topic(this.sel);
+		const t = this.topic(this.focus ?? this.pin ?? this.sel);
 		const all = crumbs.createSpan({ text: 'Alle Themen', cls: t ? 'ctrl-link' : 'ctrl-strong' });
 		all.onclick = () => {
-			this.sel = null;
+			this.sel = this.pin = this.focus = null;
+			this.stage = 0;
 			this.draw();
 		};
 		if (t) {
 			crumbs.createSpan({ text: ' › ', cls: 'ctrl-mono ctrl-muted' });
 			crumbs.createSpan({ text: `${t.id} ${t.name}`, cls: 'ctrl-strong' });
 		}
+		const level = this.focus ? 'stufe 2 · graph' : this.stage === 1 ? 'stufe 1 · explosion' : 'stufe 0 · übersicht';
+		crumbs.createSpan({ text: `   ${level}`, cls: 'ctrl-mono ctrl-muted ctrl-small' });
 		const main = this.data?.main?.mainTrack;
 		if (main) crumbs.createSpan({ text: `   main · ${main}`, cls: 'ctrl-mono ctrl-muted ctrl-small' });
 		const right = h.createDiv({ cls: 'ctrl-head-right' });
@@ -268,10 +324,15 @@ export class CtrlView extends ItemView {
 			return new Set([id, ...(t?.needs ?? []), ...(t?.blockedBy ?? []), ...topics.filter((x) => x.needs.includes(id) || x.blockedBy.includes(id)).map((x) => x.id)]);
 		};
 
-		const hitG = svg('g', {}, s);
-		const depG = svg('g', {}, s);
-		const bodyG = svg('g', {}, s);
-		const labelG = svg('g', {}, s);
+		const exploded = this.stage === 1 ? this.pin : null;
+		if (exploded) s.addClass('is-exploded');
+		const camG = svg('g', { class: 'ctrl-cam' }, s);
+		const hitG = svg('g', {}, camG);
+		const depG = svg('g', {}, camG);
+		const bodyG = svg('g', {}, camG);
+		const labelG = svg('g', {}, camG);
+		let hovered: string | null = null;
+		s.addEventListener('wheel', (e) => this.onWheel(e, () => hovered), { passive: false });
 		const groups = new Map<string, SVGElement[]>();
 		const add = (id: string, e: SVGElement) => {
 			const l = groups.get(id) ?? [];
@@ -286,9 +347,14 @@ export class CtrlView extends ItemView {
 			const a0 = ang - step / 2 + gap / 2;
 			const a1 = ang + step / 2 - gap / 2;
 			const rE = rOf(k.energy);
-			const g = add(t.id, svg('g', { class: 'ctrl-sector' + (k.stale ? ' is-stale' : '') + (this.sel === t.id ? ' is-selected' : '') }, bodyG));
+			const ex = exploded === t.id;
+			const push = ex ? 16 : 0;
+			const dim = exploded && !ex ? ' is-dim' : '';
+			const g = add(t.id, svg('g', { class: 'ctrl-sector' + (k.stale ? ' is-stale' : '') + (this.sel === t.id && !exploded ? ' is-selected' : '') + dim }, bodyG));
 			const outline = k.blocked ? 'is-blocked' : k.stale ? 'is-stale' : '';
-			svg('path', { d: sectorPath(R0, rE, a0, a1), class: 'ctrl-sector-fill ctrl-outline ' + outline }, g);
+			if (!ex) svg('path', { d: sectorPath(R0, rE, a0, a1), class: 'ctrl-sector-fill ctrl-outline ' + outline }, g);
+			else svg('path', { d: sectorPath(R0, R0 + 10, a0, a1), class: 'ctrl-sector-fill ctrl-outline ' + outline }, g);
+			let maxSteps = 0;
 
 			// slices = goals: width = 8 % minimum + rest proportional to goal energy
 			const goals = t.goals.filter((x) => x.steps.length || !x.implicit);
@@ -303,6 +369,28 @@ export class CtrlView extends ItemView {
 				const gw = minW + (free * (ge[j] ?? 0)) / ssum;
 				const done = go.steps.filter((x) => x.done).length;
 				const pr = go.steps.length ? done / go.steps.length : 0;
+				if (ex) {
+					// explosion: slices pushed outwards, goal number, steps as a row outside the slice
+					const g0 = ga + 1.2;
+					const g1 = ga + gw - 1.2;
+					svg('path', { d: sectorPath(R0 + push, rE + push, g0, g1), class: 'ctrl-sector-fill ctrl-outline ' + outline }, g);
+					if (pr > 0 && rE > R0 + 1) svg('path', { d: sectorPath(R0 + push, R0 + push + (rE - R0) * pr, g0, g1), class: 'ctrl-progress' }, g);
+					if (gw >= 5 && rE - R0 > 22) {
+						const [nx, ny] = pol(R0 + push + (rE - R0) * 0.5, (g0 + g1) / 2);
+						const nt = svg('text', { x: nx, y: ny + 2, class: 'ctrl-goal-nr', 'text-anchor': 'middle' }, g);
+						nt.textContent = go.implicit ? '·' : (go.id.split('.').pop() ?? '');
+					}
+					go.steps.slice(0, 10).forEach((st, q) => {
+						const [x, y] = pol(rE + push + 7 + q * 6, (g0 + g1) / 2);
+						const c = svg('circle', { cx: x, cy: y, r: 1.7, class: 'ctrl-dot ctrl-dot-ex' + (st.done ? ' is-done' : '') }, g);
+						const tt = svg('title', {}, c);
+						tt.textContent = `${go.id} · ${st.text}${st.done ? ' ✓' : ''}`;
+					});
+					maxSteps = Math.max(maxSteps, Math.min(10, go.steps.length));
+					ga += gw;
+					bounds.push(ga);
+					return;
+				}
 				if (pr > 0 && rE > R0 + 1) svg('path', { d: sectorPath(R0, R0 + (rE - R0) * pr, ga + 0.6, ga + gw - 0.6), class: 'ctrl-progress' }, g);
 				// step dots in the core on hover / selection (● done, ○ open)
 				// dots: evenly spaced lanes (not energy width) and pushed outwards until lanes are ≥ 8 px apart
@@ -317,43 +405,54 @@ export class CtrlView extends ItemView {
 				ga += gw;
 				bounds.push(ga);
 			});
-			for (const b of bounds.slice(0, -1)) {
+			if (!ex) for (const b of bounds.slice(0, -1)) {
 				const [x1, y1] = pol(R0, b);
 				const [x2, y2] = pol(Math.max(rE, R0 + 2), b);
 				svg('line', { x1, y1, x2, y2, class: 'ctrl-slice-sep' }, g);
 			}
-			if (k.slop) svg('path', { d: sectorPath(R0, rE, a0, a1), fill: 'url(#ctrl-grain)' }, g);
+			if (k.slop) svg('path', { d: sectorPath(R0 + push, rE + push, a0, a1), fill: 'url(#ctrl-grain)' }, g);
 
 			// Soll-Marke + Δ (only when flagged, as in the design)
 			if (k.misallocFlag) {
 				const rS = rOf(energyByRank[t.prio - 1] ?? 0);
-				svg('path', { d: arcPath(rS, a0, a1), class: 'ctrl-soll' }, g);
-				const [lx, ly] = pol(Math.max(rS, rE) + 12, ang + 7);
+				svg('path', { d: arcPath(rS + push, a0, a1), class: 'ctrl-soll' }, g);
+				const [lx, ly] = pol(Math.max(rS, rE) + push + 12, ang + (ex ? 4 : 7));
 				const tx = svg('text', { x: lx, y: ly + 3, class: 'ctrl-delta', 'text-anchor': 'middle' }, g);
 				tx.textContent = (k.misalloc > 0 ? '▲ +' : '▼ ') + String(k.misalloc);
 			}
 			// direction
-			const [tx, ty] = pol(rE + (k.misallocFlag ? 22 : 6), ang);
+			const rowEnd = rE + push + 7 + maxSteps * 6;
+			const [tx, ty] = pol(ex ? rE + push + 10 : rE + (k.misallocFlag ? 22 : 6), ex ? a1 + 3 : ang);
 			if (Math.abs(k.trend) < 0.12) svg('path', { d: `M ${tx} ${ty} m -3 0 l 6 0`, class: 'ctrl-trend is-flat' }, g);
 			else svg('path', { d: arrow(tx, ty, ang - 90 + (k.trend > 0 ? 0 : 180), 6 + 12 * Math.abs(k.trend)), class: 'ctrl-trend' }, g);
 
 			// radial label, mirrored on the left half
 			const flip = ang > 180 && ang < 360;
-			const [lx, ly] = pol(RMAX + 14, ang);
+			const [lx, ly] = pol(ex ? Math.max(RMAX + 30, rowEnd + 14) : RMAX + 14, ang);
 			const label = add(
 				t.id,
-				svg('text', { x: lx, y: ly + 3, class: 'ctrl-label' + (k.stale ? ' is-stale' : ''), 'text-anchor': flip ? 'end' : 'start', transform: `rotate(${flip ? ang + 90 : ang - 90} ${lx} ${ly})` }, labelG),
+				svg('text', { x: lx, y: ly + 3, class: 'ctrl-label' + (k.stale ? ' is-stale' : '') + dim, 'text-anchor': flip ? 'end' : 'start', transform: `rotate(${flip ? ang + 90 : ang - 90} ${lx} ${ly})` }, labelG),
 			);
 			const kw = t.status.kw !== 'läuft' ? ` · ${t.status.kw}` : '';
-			label.textContent = `${t.id}  ${short(t.name, 26)}${kw}`;
+			label.textContent = ex ? `${t.id}  ${t.name}` : `${t.id}  ${short(t.name, 26)}${kw}`;
 
 			const hit = svg('path', { d: sectorPath(R0, RMAX + 130, a0, a1), class: 'ctrl-hit' }, hitG);
 			hit.onclick = () => {
-				this.sel = this.sel === t.id ? null : t.id;
-				this.draw();
+				if (this.stage === 1 && this.pin !== t.id) {
+					this.pin = t.id;
+					this.sel = t.id;
+					this.draw();
+				} else if (this.stage === 1) this.deeper(t.id);
+				else {
+					this.focus = t.id;
+					this.sel = t.id;
+					this.draw();
+				}
 			};
 			hit.ondblclick = () => this.openNote(t.path);
 			hit.onmouseenter = () => {
+				hovered = t.id;
+				if (exploded) return;
 				const rel = neighbours(t.id);
 				s.addClass('has-hover');
 				g.addClass('is-hover');
@@ -364,6 +463,7 @@ export class CtrlView extends ItemView {
 				});
 			};
 			hit.onmouseleave = () => {
+				hovered = null;
 				s.removeClass('has-hover');
 				g.removeClass('is-hover');
 			};
@@ -400,18 +500,183 @@ export class CtrlView extends ItemView {
 			}
 		}
 
+		// camera: deterministic move towards the pinned sector (S = 1.9), animated from the last position
+		let cam = 'translate(0px, 0px) scale(1)';
+		const pa = exploded ? pos.get(exploded) : undefined;
+		if (pa !== undefined) {
+			const S = 1.9;
+			const [px, py] = pol((R0 + RMAX) / 2 + 85, pa);
+			cam = `translate(${(C.x - S * px).toFixed(1)}px, ${(C.y - S * py).toFixed(1)}px) scale(${S})`;
+		}
+		camG.style.transform = this.cam;
+		if (cam !== this.cam) window.requestAnimationFrame(() => window.requestAnimationFrame(() => (camG.style.transform = cam)));
+		this.cam = cam;
+
 		const evs = this.windowEvents();
+		if (exploded) {
+			this.legend(card, ['explosion · slices = ziele (füllung = fortschritt) · ● erledigt ○ offen außen am slice', 'anderer sektor = umpinnen · gepinnter sektor / rad hinein = graph', 'rad heraus / esc = übersicht'], 'rad = stufe · klick = pin · doppelklick = notiz');
+			return;
+		}
 		const c1 = svg('text', { x: C.x, y: C.y - 2, class: 'ctrl-center', 'text-anchor': 'middle' }, s);
 		c1.textContent = `${evs.filter((e) => e.topic).length} ereignisse · ${this.win} d`;
 		const c2 = svg('text', { x: C.x, y: C.y + 12, class: 'ctrl-center ctrl-center-2', 'text-anchor': 'middle' }, s);
 		c2.textContent = `${evs.filter((e) => !e.topic).length} nicht zugeordnet`;
 
+		this.legend(
+			card,
+			['radius = energie · slice = ziel (breite = anteil, füllung = fortschritt)', '▮ soll-marke + Δ = fehlallokation · pfeil = richtung · körnung = slop', 'gepunktet + blass = stale · farbe = nur blockiert'],
+			'klick = graph · rad hinein = explosion · doppelklick = notiz',
+		);
+	}
+
+	private legend(card: HTMLElement, lines: string[], gesture: string) {
 		const foot = card.createDiv({ cls: 'ctrl-legend ctrl-mono' });
-		const legend = foot.createDiv();
-		legend.createDiv({ text: 'radius = energie · slice = ziel (breite = anteil, füllung = fortschritt)' });
-		legend.createDiv({ text: '▮ soll-marke + Δ = fehlallokation · pfeil = richtung · körnung = slop' });
-		legend.createDiv({ text: 'gepunktet + blass = stale · farbe = nur blockiert' });
-		foot.createDiv({ text: 'klick = detail · doppelklick = notiz · esc = übersicht', cls: 'ctrl-gesture' });
+		const l = foot.createDiv();
+		for (const x of lines) l.createDiv({ text: x });
+		foot.createDiv({ text: gesture, cls: 'ctrl-gesture' });
+	}
+
+	// ── Stufe 2 · Graph ────────────────────────────────────
+	private renderGraph(card: HTMLElement, t: Topic, topics: Topic[]) {
+		const k = this.sig.get(t.id) as Signals;
+		const ref = this.today;
+		const lanes = [...t.goals.filter((g) => g.steps.length || !g.implicit).sort((a, b) => Number(b.cd) - Number(a.cd))];
+		const par = t.parallel.length ? [{ id: `${t.id}.p`, name: 'Parallel', implicit: true, cd: false, metric: '', steps: t.parallel }] : [];
+		const rows = [...lanes, ...par];
+		const rowH = 46;
+		const L = 232;
+		const W = 860;
+		const T = 56;
+		const xMin = L;
+		const xMax = W - 60 - 90;
+		const H = Math.max(T + rowH * (rows.length + 1) + 50, 360);
+		const span = 355;
+		const start = addDays(ref, -span);
+		const X = (d: string) => xMin + (Math.min(span, Math.max(0, daysBetween(start, d))) / span) * (xMax - xMin);
+		const xToday = X(ref);
+		const xPlan = xToday + 14;
+		const w28 = addDays(ref, -28);
+		const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ctrl-net ctrl-graph' }, card);
+		s.addEventListener('wheel', (e) => this.onWheel(e, () => null), { passive: false });
+		const defs = svg('defs', {}, s);
+		const pat = svg('pattern', { id: 'ctrl-grain-g', width: 4, height: 4, patternUnits: 'userSpaceOnUse' }, defs);
+		svg('circle', { cx: 2, cy: 2, r: 0.8, class: 'ctrl-grain-dot' }, pat);
+		const tx = (x: number, y: number, text: string, cls: string, anchor = 'start', parent: Element = s) => {
+			const e = svg('text', { x, y, class: cls, 'text-anchor': anchor }, parent);
+			e.textContent = text;
+			return e;
+		};
+		// month grid
+		const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+		const [sy, sm] = start.split('-').map(Number) as [number, number];
+		for (let i = 1; i <= 12; i++) {
+			const m = ((sm - 1 + i) % 12) + 1;
+			const y = sy + Math.floor((sm - 1 + i) / 12);
+			const d = `${y}-${String(m).padStart(2, '0')}-01`;
+			if (daysBetween(d, ref) < 0) break;
+			const x = X(d);
+			svg('path', { d: `M ${x} ${T - 8} V ${H - 36}`, class: 'ctrl-grid' }, s);
+			tx(x + 3, H - 24, MONTHS[m - 1] ?? '', 'ctrl-axis');
+		}
+		svg('path', { d: `M ${X(w28)} ${T - 8} H ${xToday} V ${H - 36} H ${X(w28)} Z`, class: 'ctrl-window' }, s);
+		tx(X(w28) + 3, T - 12, '28 d', 'ctrl-axis ctrl-axis-s');
+		svg('path', { d: `M ${xToday} ${T - 16} V ${H - 36}`, class: 'ctrl-today' }, s);
+		tx(xToday, T - 20, 'heute', 'ctrl-axis ctrl-axis-2', 'middle');
+		tx(xPlan + 2, T - 20, 'offen →', 'ctrl-axis ctrl-axis-s');
+
+		// trunk
+		const yT = T + rowH / 2;
+		const evs = (this.data?.events ?? []).filter((e) => e.topic === t.id && daysBetween(e.at, ref) >= 0);
+		const firstEv = evs.map((e) => e.at).sort()[0] ?? addDays(ref, -30);
+		svg('path', { d: `M ${X(firstEv)} ${yT} H ${xToday}`, class: 'ctrl-trunk' + (k.blocked ? ' is-blocked' : '') }, s);
+		tx(L - 10, yT - 2, t.id, 'ctrl-axis ctrl-axis-m', 'end');
+		tx(L - 10, yT + 10, short(t.name, 30), 'ctrl-g-name ctrl-g-trunk', 'end');
+		const flags = [k.blocked && 'blockiert', k.slop && 'slop', k.misallocFlag && (k.misalloc > 0 ? `▲ +${k.misalloc}` : `▼ ${k.misalloc}`), k.stale && 'stale'].filter(Boolean).join(' · ');
+		if (flags) tx(xToday + 6, yT + 3, flags, 'ctrl-g-flags' + (k.blocked ? ' is-blocked' : ''));
+		// topic events without goal → ticks on the trunk
+		const seenT = new Set<number>();
+		for (const e of evs.filter((x) => !x.goal)) {
+			const b = Math.round(daysBetween(start, e.at) / 3);
+			if (seenT.has(b)) continue;
+			seenT.add(b);
+			const x = X(e.at);
+			svg('path', { d: `M ${x} ${yT - 9} V ${yT - 4}`, class: 'ctrl-tick' }, s);
+		}
+
+		rows.forEach((g, i) => {
+			const y = T + rowH * (i + 1) + rowH / 2;
+			const row = svg('g', { class: 'ctrl-row-g' }, s);
+			const done = g.steps.filter((x) => x.done).sort((a, b) => (a.doneAt ?? '').localeCompare(b.doneAt ?? ''));
+			const open = g.steps.filter((x) => !x.done);
+			const gev = evs.filter((e) => e.goal === g.id);
+			const dated = done.map((x) => x.doneAt).filter((d): d is string => !!d);
+			const lastDone = dated[dated.length - 1];
+			const stale = !lastDone || daysBetween(lastDone, ref) > this.staleDays;
+			const cls = k.blocked ? ' is-blocked' : stale ? ' is-stale' : '';
+			const t0 = [...gev.map((e) => e.at), ...dated].sort()[0] ?? addDays(ref, -30);
+			const x0 = X(t0);
+			const xLast = lastDone ? X(lastDone) : x0;
+			svg('path', { d: `M ${x0} ${yT} C ${x0} ${yT + rowH / 2} ${x0 + 10} ${y - rowH / 2} ${x0 + 10} ${y}`, class: 'ctrl-branch-fork' + cls }, row);
+			svg('path', { d: `M ${x0 + 10} ${y} H ${Math.max(xLast, x0 + 10)}`, class: 'ctrl-branch' + cls }, row);
+			svg('path', { d: `M ${Math.max(xLast, x0 + 10)} ${y} H ${xToday}`, class: 'ctrl-branch' + cls + (stale ? ' is-decay' : '') }, row);
+			if (!open.length && done.length && lastDone) svg('path', { d: `M ${xLast} ${y} C ${xLast + 10} ${y} ${xLast + 14} ${yT + rowH / 2} ${xLast + 16} ${yT}`, class: 'ctrl-branch-fork' + cls }, row);
+			const seen = new Set<number>();
+			for (const e of gev) {
+				const b = Math.round(daysBetween(start, e.at) / 3);
+				if (seen.has(b)) continue;
+				seen.add(b);
+				const x = X(e.at);
+				svg('path', { d: `M ${x} ${y - 9} V ${y - 4}`, class: 'ctrl-tick' }, row);
+			}
+			const inWin = gev.filter((e) => daysBetween(e.at, ref) < 28).length;
+			const doneWin = dated.filter((d) => daysBetween(d, ref) < 28).length;
+			if (inWin >= 4 && doneWin === 0) svg('path', { d: `M ${X(w28)} ${y - 12} H ${xToday} V ${y + 12} H ${X(w28)} Z`, fill: 'url(#ctrl-grain-g)' }, row);
+			const stepDot = (st: Step, x: number, isDone: boolean) => {
+				const c = svg('circle', { cx: x, cy: y, r: 3.5, class: isDone ? 'ctrl-commit' : 'ctrl-open' + cls }, row);
+				const tt = svg('title', {}, c);
+				tt.textContent = `${st.text}${st.doneAt ? ' · ' + st.doneAt : ''}`;
+				const hit = svg('circle', { cx: x, cy: y, r: 8, class: 'ctrl-hit' }, row);
+				hit.appendChild(tt.cloneNode(true));
+				hit.onclick = () => void this.write(() => this.service.toggle(t.path, st, !st.done));
+			};
+			for (const st of done) stepDot(st, st.doneAt ? X(st.doneAt) : xToday - 4, true);
+			open.forEach((st, j) => stepDot(st, xPlan + 6 + j * 12, false));
+			const nr = g.implicit ? (g.name === 'Parallel' ? 'p' : '·') : (g.id.split('.').pop() ?? '');
+			tx(L - 10, y - 2, `${nr} · ${done.length}/${g.steps.length}${stale && lastDone ? ' · stale ' + daysBetween(lastDone, ref) + ' d' : ''}${g.cd ? ' · cd' : ''}`, 'ctrl-axis' + (stale ? ' ctrl-axis-m' : ' ctrl-axis-2'), 'end', row);
+			tx(L - 10, y + 10, short(g.name, 30), 'ctrl-g-name' + (stale ? ' is-stale' : ''), 'end', row);
+			const hitRow = svg('path', { d: `M 0 ${y - rowH / 2} H ${W} V ${y + rowH / 2} H 0 Z`, class: 'ctrl-row-hit' }, s);
+			s.insertBefore(hitRow, s.firstChild?.nextSibling ?? null);
+			hitRow.onmouseenter = () => {
+				s.addClass('has-hover');
+				row.addClass('is-related');
+			};
+			hitRow.onmouseleave = () => {
+				s.removeClass('has-hover');
+				row.removeClass('is-related');
+			};
+		});
+
+		// dependencies of the topic → ports on the right (click jumps to the other graph)
+		const deps = [...new Set([...t.needs, ...t.blockedBy])].map((id) => ({ id, type: t.blockedBy.includes(id) ? 'blockiert' : 'braucht', out: false }));
+		for (const o of topics) if (o.needs.includes(t.id) || o.blockedBy.includes(t.id)) deps.push({ id: o.id, type: 'liefert an', out: true });
+		deps.forEach((d, i) => {
+			const y = yT + i * 12;
+			const x = W - 56;
+			const blk = d.type === 'blockiert';
+			svg('path', { d: `M ${x} ${y} H ${x + 14}`, class: 'ctrl-port' + (blk ? ' is-blocked' : '') }, s);
+			const lt = tx(x + 18, y + 3, `${d.type} ${d.id}`, 'ctrl-port-label ctrl-link' + (blk ? ' is-blocked' : ''));
+			lt.onclick = () => {
+				this.focus = d.id;
+				this.sel = d.id;
+				this.draw();
+			};
+		});
+
+		this.legend(
+			card,
+			['trunk = thema · branch = ziel (cd zuerst) · ● commit = erledigter schritt · ○ rechts = offen, in reihenfolge', 'tick oben = ereignis · körnung im 28-d-fenster = slop · gepunktet + blass nach letztem commit = stale', 'port rechts = abhängigkeit (energieton = blockiert), klick springt'],
+			'klick ○/● = erledigt umschalten · rad heraus / esc = explosion',
+		);
 	}
 	private windowEvents(): BoardEvent[] {
 		const ref = this.today;

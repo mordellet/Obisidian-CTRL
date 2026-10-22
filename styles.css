@@ -163,3 +163,41 @@
 .ctrl .ctrl-cd-bar { width: 28px; height: 4px; flex: none; background: var(--ctrl-surface-overlay); border-radius: 1px; overflow: hidden; }
 .ctrl .ctrl-cd-fill { display: block; height: 100%; background: var(--ctrl-fg-2); }
 .ctrl .ctrl-cd.is-still .ctrl-grow { color: var(--ctrl-fg-2); }
+
+/* zoom stages */
+.ctrl .ctrl-cam { transform-origin: 0 0; transition: transform 350ms var(--ctrl-ease); }
+.ctrl .ctrl-sector.is-dim, .ctrl .ctrl-label.is-dim { opacity: 0.3; }
+.ctrl .is-exploded .ctrl-center { display: none; }
+.ctrl .ctrl-goal-nr { font-family: var(--ctrl-mono); font-size: 5.5px; font-weight: 600; fill: var(--ctrl-fg); }
+.ctrl .ctrl-dot-ex { stroke-width: 0.8; }
+/* graph */
+.ctrl .ctrl-grid { stroke: var(--ctrl-hairline); }
+.ctrl .ctrl-window { fill: var(--ctrl-surface-overlay); }
+.ctrl .ctrl-today { stroke: var(--ctrl-fg-2); stroke-dasharray: 1 3; }
+.ctrl .ctrl-axis { font-family: var(--ctrl-mono); font-size: 9px; fill: var(--ctrl-fg-3); }
+.ctrl .ctrl-axis-s { font-size: 8px; }
+.ctrl .ctrl-axis-2 { fill: var(--ctrl-fg-2); }
+.ctrl .ctrl-axis-m { fill: var(--ctrl-fg-3); font-size: 10px; }
+.ctrl .ctrl-g-name { font-size: 11px; fill: var(--ctrl-fg); }
+.ctrl .ctrl-g-name.is-stale { fill: var(--ctrl-fg-3); }
+.ctrl .ctrl-g-trunk { font-weight: 500; }
+.ctrl .ctrl-g-flags { font-family: var(--ctrl-mono); font-size: 9px; font-weight: 600; fill: var(--ctrl-fg); }
+.ctrl .ctrl-g-flags.is-blocked, .ctrl .ctrl-port-label.is-blocked { fill: var(--ctrl-energy); }
+.ctrl .ctrl-trunk { stroke: var(--ctrl-fg); stroke-width: 2; fill: none; }
+.ctrl .ctrl-trunk.is-blocked { stroke: var(--ctrl-energy); }
+.ctrl .ctrl-branch, .ctrl .ctrl-branch-fork { fill: none; stroke: var(--ctrl-fg-2); stroke-width: 1.5; }
+.ctrl .ctrl-branch-fork { stroke-width: 1.2; }
+.ctrl .ctrl-branch.is-stale, .ctrl .ctrl-branch-fork.is-stale { stroke: var(--ctrl-fg-3); }
+.ctrl .ctrl-branch.is-blocked, .ctrl .ctrl-branch-fork.is-blocked { stroke: var(--ctrl-energy); }
+.ctrl .ctrl-branch.is-decay { stroke-dasharray: 2 3; opacity: 0.45; }
+.ctrl .ctrl-tick { stroke: var(--ctrl-fg-3); }
+.ctrl .ctrl-commit { fill: var(--ctrl-fg); stroke: var(--ctrl-surface-raised); stroke-width: 1.5; }
+.ctrl .ctrl-open { fill: var(--ctrl-surface-raised); stroke: var(--ctrl-fg-2); stroke-width: 1.2; }
+.ctrl .ctrl-open.is-stale { stroke: var(--ctrl-fg-3); }
+.ctrl .ctrl-open.is-blocked { stroke: var(--ctrl-energy); }
+.ctrl .ctrl-row-g { transition: opacity 200ms var(--ctrl-ease); }
+.ctrl .ctrl-graph.has-hover .ctrl-row-g:not(.is-related) { opacity: 0.35; }
+.ctrl .ctrl-row-hit { fill: transparent; }
+.ctrl .ctrl-port { stroke: var(--ctrl-strong); }
+.ctrl .ctrl-port.is-blocked { stroke: var(--ctrl-energy); stroke-width: 1.5; }
+.ctrl .ctrl-port-label { font-family: var(--ctrl-mono); font-size: 8px; fill: var(--ctrl-fg-2); }

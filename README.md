@@ -20,7 +20,8 @@ Fortschritt, Blockaden, Fokus und offene Fragen – direkt aus dem Vault.
 - Detail-Karte (Thema) bzw. Übersicht mit **Fokus** und **Zu klären**.
 - Statuszeile: `[ID] [kw:] ein Satz` + Enter. Runde-Modus blendet `confidential` aus.
 - Demo-Modus (Knopf „demo") lädt die Testdaten des Design-Handoffs (read-only) zum Vergleich.
-- Noch nicht umgesetzt: Stufe 1 (Explosion), Stufe 2 (Graph), Zeitreihe/Play.
+- Zoom: Klick = Graph (Stufe 2), Rad/Pinch über Sektor = Explosion (Stufe 1, Kamerafahrt), Rad heraus/Esc = zurück.
+- Noch nicht umgesetzt: Zeitreihe/Play, Ziel-Abhängigkeiten im Graph.
 
 ## Entwicklung
 ```bash
