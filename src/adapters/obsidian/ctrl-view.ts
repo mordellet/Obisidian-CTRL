@@ -63,7 +63,6 @@ export class CtrlView extends ItemView {
 	private sig = new Map<string, Signals>();
 	private sel: string | null = null;
 	private mode: 'jahr' | '28' = 'jahr';
-	private runde = false;
 	private demo = false;
 	private hint = '';
 	private draft = '';
@@ -172,7 +171,7 @@ export class CtrlView extends ItemView {
 		return this.data?.main?.staleDays ?? this.defaultStale();
 	}
 	private visibleTopics(): Topic[] {
-		return (this.data?.topics ?? []).filter((t) => !(this.runde && t.confidential)).sort((a, b) => a.prio - b.prio);
+		return (this.data?.topics ?? []).sort((a, b) => a.prio - b.prio);
 	}
 	private topic(id: string | null) {
 		return this.visibleTopics().find((t) => t.id === id);
@@ -316,12 +315,6 @@ export class CtrlView extends ItemView {
 			this.drawBody();
 		};
 		this.refLabel = tl.createSpan({ cls: 'ctrl-mono ctrl-small ctrl-ref' + (this.mode === '28' ? '' : ' ctrl-muted') });
-		const r = right.createEl('button', { text: this.runde ? 'runde · an' : 'runde · aus', cls: 'ctrl-btn' + (this.runde ? ' is-active' : '') });
-		r.onclick = () => {
-			this.runde = !this.runde;
-			if (this.sel && !this.topic(this.sel)) this.sel = null;
-			this.draw();
-		};
 		const d = right.createEl('button', { text: this.demo ? 'demo · an' : 'demo · aus', cls: 'ctrl-btn' + (this.demo ? ' is-active' : '') });
 		d.onclick = () => {
 			this.demo = !this.demo;

@@ -18,7 +18,7 @@ Fortschritt, Blockaden, Fokus und offene Fragen – direkt aus dem Vault.
 - Stufe 0 (radial): Radius = Energie, Füllung = Fortschritt, Bogen = Soll laut Priorität,
   Pfeil = Richtung, gepunktet = stale, Körnung = Slop, Farbe nur für Blockade.
 - Detail-Karte (Thema) bzw. Übersicht mit **Fokus** und **Zu klären**.
-- Statuszeile: `[ID] [kw:] ein Satz` + Enter. Runde-Modus blendet `confidential` aus.
+- Statuszeile: `[ID] [kw:] ein Satz` + Enter.
 - Demo-Modus (Knopf „demo") lädt die Testdaten des Design-Handoffs (read-only) zum Vergleich.
 - Zoom: Klick = Graph (Stufe 2), Rad/Pinch über Sektor = Explosion (Stufe 1, Kamerafahrt), Rad heraus/Esc = zurück.
 - Zeitreihe: `jahr` = Gesamtsicht; Regler/▶ = 28-Tage-Fenster wandert durch das Jahr (alle Signale zum Zeitpunkt).
