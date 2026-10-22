@@ -21,12 +21,14 @@ Fortschritt, Blockaden, Fokus und offene Fragen – direkt aus dem Vault.
 - Statuszeile: `[ID] [kw:] ein Satz` + Enter. Runde-Modus blendet `confidential` aus.
 - Demo-Modus (Knopf „demo") lädt die Testdaten des Design-Handoffs (read-only) zum Vergleich.
 - Zoom: Klick = Graph (Stufe 2), Rad/Pinch über Sektor = Explosion (Stufe 1, Kamerafahrt), Rad heraus/Esc = zurück.
-- Noch nicht umgesetzt: Zeitreihe/Play, Ziel-Abhängigkeiten im Graph.
+- Zeitreihe: `jahr` = Gesamtsicht; Regler/▶ = 28-Tage-Fenster wandert durch das Jahr (alle Signale zum Zeitpunkt).
+- Bearbeiten: Name (Umbenennen der Notiz), `+ ziel`, `+ schritt` / `+` je Ziel, Schritt wählen → erledigt setzen.
+- Ziel-Abhängigkeiten: unter der Ziel-Überschrift `Braucht: S8.1` / `Blockiert durch: S4.1` → im Graph als Senkrechte bzw. Port.
 
 ## Entwicklung
 ```bash
 pnpm install
-pnpm check            # lint, typecheck, test, arch (hexagonal: domain ← ports ← application ← adapters)
+pnpm check            # lint, typecheck, test (inkl. View-Simulation unter jsdom), arch (hexagonal: domain ← ports ← application ← adapters)
 pnpm install-vault    # build + Kopie nach <vault>/.obsidian/plugins/ctrl-board (CTRL_VAULT überschreibt)
 ```
 Gerüst übernommen von Filavi (esbuild, eslint-plugin-obsidianmd, vitest, dependency-cruiser).

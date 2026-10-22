@@ -74,6 +74,16 @@ export class CtrlView extends ItemView {
 	private acc = 0;
 	private lock = 0;
 	private cam = 'translate(0px, 0px) scale(1)';
+	/** Zeitreihe: t = Tage vor heute (Modus 28 d), Play läuft von 320 → 0. */
+	private t = 0;
+	private playing = false;
+	private timer: number | null = null;
+	/** gewählter Schritt / Ziel (`topicId|stepId` bzw. Ziel-ID) */
+	private selStep: { topic: string; id: string } | null = null;
+	private adding: string | null = null;
+	private bodyEl: HTMLElement | null = null;
+	private refLabel: HTMLElement | null = null;
+	private retries = 0;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -106,8 +116,12 @@ export class CtrlView extends ItemView {
 	private get service(): BoardService {
 		return this.demo ? this.demoService : this.live;
 	}
-	private get today(): string {
+	private get baseToday(): string {
 		return this.demo ? '2026-10-21' : this.clock.today();
+	}
+	/** Referenzzeitpunkt: heute oder Reglerposition (nur im 28-d-Modus). */
+	private get today(): string {
+		return this.mode === '28' ? addDays(this.baseToday, -this.t) : this.baseToday;
 	}
 
 	async refresh() {
@@ -116,6 +130,38 @@ export class CtrlView extends ItemView {
 		} catch (e) {
 			this.hint = `load failed · ${(e as Error).message}`;
 		}
+		// metadata index not ready yet right after start → retry a few times
+		if (!this.demo && this.data && !this.data.topics.length && this.retries < 8) {
+			this.retries++;
+			window.setTimeout(() => void this.refresh(), 750);
+		} else this.retries = 0;
+		this.draw();
+	}
+
+	async onClose() {
+		this.stopPlay();
+	}
+
+	private stopPlay() {
+		this.playing = false;
+		if (this.timer !== null) window.clearInterval(this.timer);
+		this.timer = null;
+	}
+
+	private togglePlay() {
+		if (this.playing) {
+			this.stopPlay();
+			this.draw();
+			return;
+		}
+		this.mode = '28';
+		if (this.t <= 0) this.t = 320;
+		this.playing = true;
+		this.timer = window.setInterval(() => {
+			this.t = Math.max(0, this.t - 3);
+			if (this.t === 0) this.stopPlay();
+			this.drawBody();
+		}, 120);
 		this.draw();
 	}
 
@@ -155,7 +201,10 @@ export class CtrlView extends ItemView {
 		} else if (this.stage === 1) {
 			this.stage = 0;
 			this.pin = null;
-		} else this.sel = null;
+		} else {
+			this.sel = null;
+			this.selStep = null;
+		}
 		this.draw();
 	}
 
@@ -196,10 +245,21 @@ export class CtrlView extends ItemView {
 			root.createDiv({ cls: 'ctrl-empty', text: this.hint || 'lade …' });
 			return;
 		}
-		const topics = this.visibleTopics();
-		this.sig = computeSignals(topics, data.events, { ref: this.today, win: this.win, staleDays: this.staleDays });
 		this.renderHeader(root);
 		this.renderStatusLine(root);
+		this.bodyEl = root.createDiv({ cls: 'ctrl-body-wrap' });
+		this.drawBody();
+	}
+
+	/** Re-renders stage + unassigned only (keeps header controls, e.g. while dragging the slider). */
+	drawBody() {
+		const data = this.data;
+		const root = this.bodyEl;
+		if (!data || !root) return;
+		root.empty();
+		if (this.refLabel) this.refLabel.setText(this.mode === '28' ? `${this.today} · 28 d` : 'gesamt · 365 d');
+		const topics = this.visibleTopics();
+		this.sig = computeSignals(topics, data.events, { ref: this.today, win: this.win, staleDays: this.staleDays });
 		const stage = root.createDiv({ cls: 'ctrl-stage' });
 		const netCard = stage.createDiv({ cls: 'ctrl-card ctrl-net-card' });
 		const focusTopic = this.topic(this.focus);
@@ -232,17 +292,30 @@ export class CtrlView extends ItemView {
 		const main = this.data?.main?.mainTrack;
 		if (main) crumbs.createSpan({ text: `   main · ${main}`, cls: 'ctrl-mono ctrl-muted ctrl-small' });
 		const right = h.createDiv({ cls: 'ctrl-head-right' });
-		const seg = right.createDiv({ cls: 'ctrl-seg' });
-		for (const [m, label] of [
-			['28', '28 d'],
-			['jahr', 'jahr'],
-		] as const) {
-			const b = seg.createEl('button', { text: label, cls: this.mode === m ? 'is-active' : '' });
-			b.onclick = () => {
-				this.mode = m;
-				this.draw();
-			};
-		}
+		// Zeitreihe: Jahr = Gesamtsicht · Regler/Play = 28-Tage-Fenster wandert durch das Jahr
+		const tl = right.createDiv({ cls: 'ctrl-timeline' });
+		const year = tl.createEl('button', { text: 'jahr', cls: this.mode === 'jahr' ? 'is-active' : '' });
+		year.onclick = () => {
+			this.stopPlay();
+			this.mode = this.mode === 'jahr' ? '28' : 'jahr';
+			this.draw();
+		};
+		const play = tl.createEl('button', { text: this.playing ? '❚❚' : '▶', cls: 'ctrl-play' + (this.playing ? ' is-playing' : ''), attr: { 'aria-label': 'Wiedergabe 28-Tage-Fenster' } });
+		play.onclick = () => this.togglePlay();
+		const slider = tl.createEl('input', { type: 'range', cls: 'ctrl-slider' });
+		slider.min = '0';
+		slider.max = '320';
+		slider.value = String(320 - this.t);
+		slider.oninput = () => {
+			this.stopPlay();
+			if (this.mode !== '28') {
+				this.mode = '28';
+				year.removeClass('is-active');
+			}
+			this.t = 320 - Number(slider.value);
+			this.drawBody();
+		};
+		this.refLabel = tl.createSpan({ cls: 'ctrl-mono ctrl-small ctrl-ref' + (this.mode === '28' ? '' : ' ctrl-muted') });
 		const r = right.createEl('button', { text: this.runde ? 'runde · an' : 'runde · aus', cls: 'ctrl-btn' + (this.runde ? ' is-active' : '') });
 		r.onclick = () => {
 			this.runde = !this.runde;
@@ -256,7 +329,7 @@ export class CtrlView extends ItemView {
 			this.hint = '';
 			void this.refresh();
 		};
-		right.createSpan({ text: this.today, cls: 'ctrl-mono ctrl-small' });
+		right.createSpan({ text: this.baseToday, cls: 'ctrl-mono ctrl-small ctrl-muted' });
 		const re = right.createEl('button', { text: '↻', cls: 'ctrl-btn' });
 		re.onclick = () => void this.refresh();
 	}
@@ -555,7 +628,7 @@ export class CtrlView extends ItemView {
 		const k = this.sig.get(t.id) as Signals;
 		const ref = this.today;
 		const lanes = [...t.goals.filter((g) => g.steps.length || !g.implicit).sort((a, b) => Number(b.cd) - Number(a.cd))];
-		const par = t.parallel.length ? [{ id: `${t.id}.p`, name: 'Parallel', implicit: true, cd: false, metric: '', steps: t.parallel }] : [];
+		const par = t.parallel.length ? [{ id: `${t.id}.p`, name: 'Parallel', implicit: true, cd: false, metric: '', needs: [] as string[], blockedBy: [] as string[], line: -1, lastLine: -1, steps: t.parallel }] : [];
 		const rows = [...lanes, ...par];
 		const rowH = 46;
 		const L = 232;
@@ -651,7 +724,12 @@ export class CtrlView extends ItemView {
 				tt.textContent = `${st.text}${st.doneAt ? ' · ' + st.doneAt : ''}`;
 				const hit = svg('circle', { cx: x, cy: y, r: 8, class: 'ctrl-hit' }, row);
 				hit.appendChild(tt.cloneNode(true));
-				hit.onclick = () => void this.write(() => this.service.toggle(t.path, st, !st.done));
+				hit.onclick = () => {
+					this.selStep = { topic: t.id, id: st.id };
+					this.sel = t.id;
+					this.draw();
+				};
+				if (this.selStep?.id === st.id) c.addClass('is-sel');
 			};
 			for (const st of done) stepDot(st, st.doneAt ? X(st.doneAt) : xToday - 4, true);
 			open.forEach((st, j) => stepDot(st, xPlan + 6 + j * 12, false));
@@ -668,6 +746,53 @@ export class CtrlView extends ItemView {
 				s.removeClass('has-hover');
 				row.removeClass('is-related');
 			};
+		});
+
+		// goal-level dependencies: inside the topic as vertical connector, outside as port on the row
+		const laneY = new Map(rows.map((g, i) => [g.id, T + rowH * (i + 1) + rowH / 2]));
+		let vi = 0;
+		rows.forEach((g) => {
+			const yb = laneY.get(g.id) ?? 0;
+			const edges = [...g.needs.map((id) => ({ id, blk: false })), ...g.blockedBy.map((id) => ({ id, blk: true }))];
+			edges.forEach((d, j) => {
+				const ya = laneY.get(d.id);
+				const cls = d.blk ? ' is-blocked' : '';
+				if (ya !== undefined) {
+					const x = xToday - 24 - vi++ * 6;
+					svg('path', { d: `M ${x} ${ya} V ${yb}`, class: 'ctrl-port' + cls }, s);
+					svg('path', { d: arrow(x, yb + (yb > ya ? -8 : 8), yb > ya ? 90 : -90, 7), class: 'ctrl-port ctrl-port-arrow' + cls }, s);
+				} else {
+					const x = W - 56;
+					const y = yb + j * 10;
+					svg('path', { d: `M ${x} ${y} H ${x + 14}`, class: 'ctrl-port' + cls }, s);
+					const lt = tx(x + 18, y + 3, `${d.blk ? 'blockiert' : 'braucht'} ${d.id}`, 'ctrl-port-label ctrl-link' + cls);
+					lt.onclick = () => {
+						const other = d.id.split('.')[0] ?? d.id;
+						this.focus = other;
+						this.sel = other;
+						this.selStep = null;
+						this.draw();
+					};
+				}
+			});
+			// incoming from other topics' goals
+			for (const o of topics) {
+				if (o.id === t.id) continue;
+				for (const og of o.goals) {
+					if (og.needs.includes(g.id) || og.blockedBy.includes(g.id)) {
+						const blk = og.blockedBy.includes(g.id);
+						const x = W - 56;
+						const y = yb - 10;
+						svg('path', { d: `M ${x} ${y} H ${x + 14}`, class: 'ctrl-port' + (blk ? ' is-blocked' : '') }, s);
+						const lt = tx(x + 18, y + 3, `liefert an ${og.id}`, 'ctrl-port-label ctrl-link' + (blk ? ' is-blocked' : ''));
+						lt.onclick = () => {
+							this.focus = o.id;
+							this.sel = o.id;
+							this.draw();
+						};
+					}
+				}
+			}
 		});
 
 		// dependencies of the topic → ports on the right (click jumps to the other graph)
@@ -689,7 +814,7 @@ export class CtrlView extends ItemView {
 		this.legend(
 			card,
 			['trunk = thema · branch = ziel (cd zuerst) · ● commit = erledigter schritt · ○ rechts = offen, in reihenfolge', 'tick oben = ereignis · körnung im 28-d-fenster = slop · gepunktet + blass nach letztem commit = stale', 'port rechts = abhängigkeit (energieton = blockiert), klick springt'],
-			'klick ○/● = erledigt umschalten · rad heraus / esc = explosion',
+			'klick ○/● = schritt wählen · rad heraus / esc = explosion',
 		);
 	}
 	private windowEvents(): BoardEvent[] {
@@ -712,8 +837,21 @@ export class CtrlView extends ItemView {
 			.filter(Boolean)
 			.join(' · ');
 		head.createSpan({ text: flags, cls: 'ctrl-mono ctrl-small' + (sg.blocked ? ' ctrl-energy' : ' ctrl-muted') });
-		const name = card.createDiv({ text: t.name, cls: 'ctrl-name ctrl-link' });
-		name.onclick = () => this.openNote(t.path);
+		const name = card.createEl('input', { type: 'text', cls: 'ctrl-name ctrl-name-input', attr: { 'aria-label': 'Name' } });
+		name.value = t.name;
+		name.disabled = this.demo;
+		const commitName = () => {
+			if (name.value.trim() && name.value.trim() !== t.name) void this.write(() => this.service.rename(t, name.value));
+		};
+		name.onkeydown = (e) => {
+			if (e.key === 'Enter') name.blur();
+			if (e.key === 'Escape') {
+				name.value = t.name;
+				name.blur();
+				e.stopPropagation();
+			}
+		};
+		name.onblur = commitName;
 
 		const actions = card.createDiv({ cls: 'ctrl-actions' });
 		const btn = (label: string, fn: () => void) => {
@@ -722,7 +860,34 @@ export class CtrlView extends ItemView {
 		};
 		btn('▲ priorität', () => this.data && void this.write(() => this.service.movePrio(this.data as BoardData, t.id, -1)));
 		btn('▼ priorität', () => this.data && void this.write(() => this.service.movePrio(this.data as BoardData, t.id, 1)));
+		btn('+ ziel', () => {
+			this.adding = 'goal';
+			this.draw();
+		});
+		btn('+ schritt', () => {
+			this.adding = t.goals[0]?.id ?? `${t.id}.0`;
+			this.draw();
+		});
 		btn('↗ notiz', () => this.openNote(t.path));
+		if (this.adding === 'goal') this.addInput(card, 'neues ziel – enter legt an', (v) => this.service.addGoal(t, v));
+
+		// gewählter Schritt
+		const chosen = this.selStep?.topic === t.id ? [...t.goals.flatMap((g) => g.steps), ...t.parallel].find((x) => x.id === this.selStep?.id) : undefined;
+		if (chosen) {
+			const sb = card.createDiv({ cls: 'ctrl-statusbox ctrl-stepbox' });
+			const hd = sb.createDiv({ cls: 'ctrl-detail-head' });
+			hd.createSpan({ text: `${chosen.goalId || t.id} · schritt`, cls: 'ctrl-mono ctrl-tiny ctrl-muted' });
+			const x = hd.createSpan({ text: '×', cls: 'ctrl-link ctrl-muted' });
+			x.onclick = () => {
+				this.selStep = null;
+				this.draw();
+			};
+			sb.createDiv({ text: chosen.text });
+			sb.createDiv({ text: chosen.done ? `erledigt · ${chosen.doneAt ?? 'ohne datum'}` : 'offen', cls: 'ctrl-mono ctrl-small ctrl-muted' });
+			const sa = sb.createDiv({ cls: 'ctrl-actions' });
+			const tb = sa.createEl('button', { text: chosen.done ? '☑ zurücknehmen' : '☐ erledigt setzen', cls: 'ctrl-btn' });
+			tb.onclick = () => void this.write(() => this.service.toggle(t.path, chosen, !chosen.done));
+		}
 
 		const box = card.createDiv({ cls: 'ctrl-statusbox' });
 		box.createDiv({ text: 'STATUS · MANUELL', cls: 'ctrl-mono ctrl-tiny ctrl-muted' });
@@ -744,11 +909,24 @@ export class CtrlView extends ItemView {
 		row('Rückführung', t.returnCondition || 'unbekannt');
 
 		const goals = [...t.goals].sort((a, b) => Number(b.cd) - Number(a.cd));
+		if (!goals.length && this.adding && this.adding !== 'goal') {
+			this.section(card, 'Schritte');
+			this.addInput(card, 'neuer schritt – enter legt an', (v) => this.service.addStep(t, `${t.id}.0`, v));
+		}
 		for (const g of goals) {
-			if (g.implicit && !g.steps.length) continue;
-			this.section(card, g.implicit ? 'Schritte' : `${g.id} ${g.name}${g.cd ? '  · cd' : ''}`);
+			if (g.implicit && !g.steps.length && this.adding !== g.id) continue;
+			const sec = card.createDiv({ cls: 'ctrl-section-row' });
+			sec.createSpan({ text: (g.implicit ? 'Schritte' : `${g.id} ${g.name}${g.cd ? '  · cd' : ''}`).toUpperCase(), cls: 'ctrl-section ctrl-mono ctrl-tiny ctrl-muted' });
+			const plus = sec.createSpan({ text: '+', cls: 'ctrl-link ctrl-mono ctrl-muted', attr: { 'aria-label': 'schritt anlegen' } });
+			plus.onclick = () => {
+				this.adding = g.id;
+				this.draw();
+			};
 			if (g.metric) card.createDiv({ text: g.metric, cls: 'ctrl-metric ctrl-small' });
+			const gd = [...g.needs.map((x) => `braucht ${x}`), ...g.blockedBy.map((x) => `blockiert durch ${x}`)];
+			if (gd.length) card.createDiv({ text: gd.join(' · '), cls: 'ctrl-metric ctrl-small' + (g.blockedBy.length ? ' ctrl-energy' : '') });
 			const list = card.createDiv({ cls: 'ctrl-list' });
+			if (this.adding === g.id) this.addInput(card, `neuer schritt in ${g.implicit ? 'Schritte' : g.id} – enter legt an`, (v) => this.service.addStep(t, g.id, v));
 			for (const st of g.steps) this.stepItem(list, t.path, st);
 		}
 		if (t.parallel.length) {
@@ -861,6 +1039,22 @@ export class CtrlView extends ItemView {
 		row('Erledigt im Fenster', String(sigs.reduce((a, s) => a + s.doneInWindow, 0)));
 	}
 
+	private addInput(card: HTMLElement, placeholder: string, fn: (v: string) => Promise<unknown>) {
+		const inp = card.createEl('input', { type: 'text', cls: 'ctrl-add', placeholder });
+		window.setTimeout(() => inp.focus(), 0);
+		inp.onkeydown = (e) => {
+			if (e.key === 'Escape') {
+				this.adding = null;
+				e.stopPropagation();
+				this.draw();
+			}
+			if (e.key !== 'Enter' || !inp.value.trim()) return;
+			const v = inp.value;
+			this.adding = null;
+			void this.write(() => fn(v));
+		};
+	}
+
 	private sortQuestions(qs: Question[]) {
 		const order: Question['kind'][] = ['entscheidung', 'frage', 'risiko'];
 		return [...qs].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
@@ -881,7 +1075,13 @@ export class CtrlView extends ItemView {
 				this.draw();
 			};
 		}
-		r.createSpan({ text: st.text, cls: 'ctrl-grow' + (st.done ? ' is-done' : '') });
+		const txt = r.createSpan({ text: st.text, cls: 'ctrl-grow ctrl-link' + (st.done ? ' is-done' : '') + (this.selStep?.id === st.id ? ' ctrl-energy' : '') });
+		txt.onclick = () => {
+			const topicId = st.goalId.split('.')[0] || st.id.split('.')[0] || '';
+			this.selStep = { topic: topicId, id: st.id };
+			if (topicId && this.topic(topicId)) this.sel = topicId;
+			this.draw();
+		};
 		r.createSpan({ text: [st.fokus ? 'fokus' : '', st.doneAt ? mmdd(st.doneAt) : ''].filter(Boolean).join(' · '), cls: 'ctrl-mono ctrl-small ctrl-muted' });
 	}
 

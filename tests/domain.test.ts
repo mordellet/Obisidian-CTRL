@@ -16,6 +16,7 @@ id: S2
   - [ ] Teilschritt
 ### S2.1 Regionen anbinden #cd
 Messung: 2 Regionen produktiv
+Braucht: S4.1, S8.2
 - [ ] EMEA
 
 ## Offene Fragen
@@ -40,6 +41,9 @@ describe('parseBody', () => {
 	it('reads #cd and the metric line', () => {
 		expect(p.goals[1]).toMatchObject({ name: 'Regionen anbinden', cd: true, metric: '2 Regionen produktiv' });
 		expect(p.goals[0]?.cd).toBe(false);
+		expect(p.goals[1]?.needs).toEqual(['S4.1', 'S8.2']);
+		expect(NOTE.split('\n')[p.goals[1]?.lastLine ?? -1]).toBe('- [ ] EMEA');
+		expect(NOTE.split('\n')[p.goalsEnd]).toBe('- [ ] EMEA');
 	});
 	it('parses questions with kinds and persons', () => {
 		expect(p.questions.map((q) => q.kind)).toEqual(['frage', 'entscheidung', 'risiko', 'frage']);
@@ -79,7 +83,8 @@ describe('computeSignals', () => {
 		blockedBy: [],
 		returnCondition: '',
 		confidential: false,
-		goals: [{ id: `${id}.0`, name: '', implicit: true, cd: false, metric: '', steps: [] }],
+		goals: [{ id: `${id}.0`, name: '', implicit: true, cd: false, metric: '', needs: [], blockedBy: [], line: -1, lastLine: -1, steps: [] }],
+		goalsEnd: -1,
 		parallel: [],
 		questions: [],
 		...extra,

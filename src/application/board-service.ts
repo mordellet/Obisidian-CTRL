@@ -48,6 +48,30 @@ export class BoardService {
 		await this.writer.setPrio(b.path, a.prio);
 	}
 
+	/** New step at the end of a goal (or of the implicit goal). */
+	async addStep(t: Topic, goalId: string, text: string): Promise<boolean> {
+		const g = t.goals.find((x) => x.id === goalId);
+		const at = g && g.lastLine >= 0 ? g.lastLine : t.goalsEnd;
+		if (at < 0) throw new Error('kein abschnitt ## Ziele');
+		const expected = await this.writer.readLine(t.path, at);
+		return this.writer.insertAfter(t.path, at, expected, [`- [ ] ${text.trim()}`]);
+	}
+
+	/** New goal at the end of `## Ziele`, numbered after the highest existing goal. */
+	async addGoal(t: Topic, name: string): Promise<string> {
+		if (t.goalsEnd < 0) throw new Error('kein abschnitt ## Ziele');
+		const n = Math.max(0, ...t.goals.filter((g) => !g.implicit).map((g) => Number(g.id.split('.').pop()) || 0)) + 1;
+		const id = `${t.id}.${n}`;
+		const expected = await this.writer.readLine(t.path, t.goalsEnd);
+		const ok = await this.writer.insertAfter(t.path, t.goalsEnd, expected, [`### ${id} ${name.trim()}`]);
+		if (!ok) throw new Error('write conflict');
+		return id;
+	}
+
+	rename(t: Topic, name: string): Promise<void> {
+		return this.writer.rename(t.path, `${t.id} ${name.trim()}`);
+	}
+
 	assign(notePath: string, topic: Topic): Promise<void> {
 		return this.writer.assignTopic(notePath, topic.id);
 	}

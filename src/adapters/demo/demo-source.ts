@@ -60,7 +60,7 @@ export function demoData(): BoardData {
 		const leafIds: string[] = [];
 		for (let g = 0; g < t.goals; g++) {
 			const gid = `${t.id}.${g + 1}`;
-			const goal: Goal = { id: gid, name: pick(GOAL_WORDS), implicit: false, cd: g === 0, metric: '', steps: [] };
+			const goal: Goal = { id: gid, name: pick(GOAL_WORDS), implicit: false, cd: g === 0, metric: '', needs: [], blockedBy: [], line: -1, lastLine: -1, steps: [] };
 			goals.push(goal);
 			leafIds.push(gid);
 			const ns = 2 + Math.floor(r() * 4);
@@ -108,6 +108,16 @@ export function demoData(): BoardData {
 				});
 			}
 		});
+		const gdep = (id: string, need: string[], blk: string[]) => {
+			const g = goals.find((x) => x.id === id);
+			if (g) {
+				g.needs.push(...need);
+				g.blockedBy.push(...blk);
+			}
+		};
+		gdep('T03.2', ['T02.1'], []);
+		gdep('T02.1', [], ['T05.2']);
+		gdep('T01.2', ['T04.3'], []);
 		topics.push({
 			id: t.id,
 			name: t.name,
@@ -119,6 +129,7 @@ export function demoData(): BoardData {
 			returnCondition: '',
 			confidential: false,
 			goals,
+			goalsEnd: -1,
 			parallel: [],
 			questions: [],
 		});
@@ -148,6 +159,15 @@ export class ReadOnlyWriter implements BoardWriter {
 		return this.fail();
 	}
 	assignTopic() {
+		return this.fail();
+	}
+	insertAfter() {
+		return this.fail();
+	}
+	rename() {
+		return this.fail();
+	}
+	readLine() {
 		return this.fail();
 	}
 }

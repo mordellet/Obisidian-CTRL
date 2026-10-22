@@ -38,6 +38,30 @@ export class VaultBoardWriter implements BoardWriter {
 		return ok;
 	}
 
+	async insertAfter(path: string, line: number, expected: string, add: string[]): Promise<boolean> {
+		let ok = false;
+		await this.app.vault.process(this.file(path), (data) => {
+			const lines = data.split('\n');
+			if (lines[line] !== expected) return data;
+			lines.splice(line + 1, 0, ...add);
+			ok = true;
+			return lines.join('\n');
+		});
+		return ok;
+	}
+
+	async rename(path: string, basename: string): Promise<void> {
+		const f = this.file(path);
+		const clean = basename.replace(/[\\/:*?"<>|#^[\]]/g, '-').trim();
+		if (!clean || clean === f.basename) return;
+		await this.app.fileManager.renameFile(f, `${f.parent?.path ? f.parent.path + '/' : ''}${clean}.md`);
+	}
+
+	async readLine(path: string, line: number): Promise<string> {
+		const data = await this.app.vault.read(this.file(path));
+		return data.split('\n')[line] ?? '';
+	}
+
 	async setPrio(topicPath: string, prio: number): Promise<void> {
 		await this.app.fileManager.processFrontMatter(this.file(topicPath), (fm: Record<string, unknown>) => {
 			fm.prio = prio;

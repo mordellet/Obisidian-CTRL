@@ -45,6 +45,12 @@ export interface Goal {
 	cd: boolean;
 	/** Messgröße (`Messung: …` direkt unter der Überschrift). */
 	metric: string;
+	/** Ziel-Abhängigkeiten (`Braucht: S8.1` / `Blockiert durch: S4.1` unter der Überschrift). */
+	needs: string[];
+	blockedBy: string[];
+	/** Zeile der Überschrift (implizit: `## Ziele`) und letzte Inhaltszeile – für Einfügen. */
+	line: number;
+	lastLine: number;
 	steps: Step[];
 }
 
@@ -68,6 +74,8 @@ export interface Topic {
 	goals: Goal[];
 	parallel: Step[];
 	questions: Question[];
+	/** letzte Inhaltszeile des Abschnitts `## Ziele` (−1 = Abschnitt fehlt) */
+	goalsEnd: number;
 }
 
 /** Activity evidence: a note that refers to a topic (or to nothing). */
@@ -96,6 +104,7 @@ export interface BoardData {
 }
 
 export interface ParsedBody {
+	goalsEnd: number;
 	goals: Goal[];
 	parallel: Step[];
 	questions: Question[];

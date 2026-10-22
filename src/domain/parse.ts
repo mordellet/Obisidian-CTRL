@@ -9,6 +9,8 @@ const PERSON = /@([\p{L}\p{N}_.-]+)/gu;
 const GOAL = /^###\s+(\S+)\s+(.*)$/;
 const CD = /(^|\s)#cd\b/;
 const METRIC = /^>?\s*Messung:\s*(.*)$/;
+const GDEP = /^>?\s*(Braucht|Blockiert durch):\s*(.*)$/i;
+const ids = (v: string) => v.split(/[,\s]+/).map((x) => x.trim()).filter((x) => /^[A-Z]+\d+(\.\d+)*$/.test(x));
 
 type Section = 'ziele' | 'fragen' | 'parallel' | 'fokus' | 'other';
 
@@ -54,30 +56,43 @@ export function parseBody(content: string, topicId: string): ParsedBody {
 	let goal: Goal | null = null;
 	const implicit = (): Goal => {
 		if (!goal) {
-			goal = { id: `${topicId}.0`, name: 'Schritte', implicit: true, cd: false, metric: '', steps: [] };
+			goal = { id: `${topicId}.0`, name: 'Schritte', implicit: true, cd: false, metric: '', needs: [], blockedBy: [], line: zieleLine, lastLine: zieleLine, steps: [] };
 			goals.push(goal);
 		}
 		return goal;
 	};
 	let counter = 0;
+	let zieleLine = -1;
+	let goalsEnd = -1;
 	for (; i < lines.length; i++) {
 		const line = lines[i] ?? '';
 		if (line.startsWith('## ')) {
 			section = sectionOf(line.slice(3).trim());
 			goal = null;
+			if (section === 'ziele') zieleLine = goalsEnd = i;
 			continue;
 		}
+		if (section === 'ziele' && line.trim()) goalsEnd = i;
 		if (section === 'ziele') {
 			const g = GOAL.exec(line);
 			if (g) {
 				const name = g[2] ?? '';
-				goal = { id: g[1] ?? '', name: name.replace(CD, ' ').trim(), implicit: false, cd: CD.test(name), metric: '', steps: [] };
+				goal = { id: g[1] ?? '', name: name.replace(CD, ' ').trim(), implicit: false, cd: CD.test(name), metric: '', needs: [], blockedBy: [], line: i, lastLine: i, steps: [] };
 				goals.push(goal);
 				continue;
 			}
 			const m = METRIC.exec(line.trim());
 			if (m && goal && !goal.implicit) {
 				goal.metric = (m[1] ?? '').trim();
+				goal.lastLine = i;
+				continue;
+			}
+			const dp = GDEP.exec(line.trim());
+			if (dp && goal && !goal.implicit) {
+				const list = ids(dp[2] ?? '');
+				if ((dp[1] ?? '').toLowerCase() === 'braucht') goal.needs.push(...list);
+				else goal.blockedBy.push(...list);
+				goal.lastLine = i;
 				continue;
 			}
 		}
@@ -114,11 +129,14 @@ export function parseBody(content: string, topicId: string): ParsedBody {
 			section,
 			goalId: target?.id ?? '',
 		};
-		if (target) target.steps.push(step);
+		if (target) {
+			target.steps.push(step);
+			target.lastLine = i;
+		}
 		else if (section === 'parallel') parallel.push(step);
 		else focus.push(step);
 	}
-	return { goals, parallel, questions, focus };
+	return { goals, parallel, questions, focus, goalsEnd };
 }
 
 /** Toggle a task line. Returns the new line. */

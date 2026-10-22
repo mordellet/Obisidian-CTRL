@@ -74,6 +74,7 @@ export class VaultBoardSource implements BoardSource {
 			reviewed: toIsoDate(fm.geprueft),
 			confidential: fm.confidential === true,
 			goals: p.goals,
+			goalsEnd: p.goalsEnd,
 			parallel: p.parallel,
 			questions: p.questions,
 		};
