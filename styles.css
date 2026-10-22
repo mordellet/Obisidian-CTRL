@@ -97,15 +97,15 @@
 .ctrl .ctrl-outline.is-blocked { stroke: var(--ctrl-energy); stroke-width: 1.5; }
 .ctrl .is-selected .ctrl-outline:not(.is-blocked) { stroke: var(--ctrl-fg); }
 .ctrl .ctrl-progress { fill: var(--ctrl-strong); }
-.ctrl .ctrl-slice-sep { stroke: var(--ctrl-surface-raised); stroke-width: 1.2; }
-.ctrl .ctrl-grain-dot { fill: var(--ctrl-fg-2); }
+.ctrl .ctrl-slice-sep { stroke: var(--ctrl-surface-base); stroke-width: 1.5; }
+.ctrl .ctrl-grain-dot { fill: var(--ctrl-fg-3); opacity: 0.55; }
 .ctrl .ctrl-soll { fill: none; stroke: var(--ctrl-fg); stroke-width: 3; }
 .ctrl .ctrl-delta { font-family: var(--ctrl-mono); font-size: 10px; font-weight: 600; fill: var(--ctrl-fg); }
 .ctrl .ctrl-trend { fill: none; stroke: var(--ctrl-fg); stroke-width: 1.2; }
 .ctrl .ctrl-trend.is-flat { stroke: var(--ctrl-fg-2); stroke-width: 1.5; }
 .ctrl .ctrl-dots { display: none; }
 .ctrl .is-hover .ctrl-dots, .ctrl .is-selected .ctrl-dots { display: inline; }
-.ctrl .ctrl-dot { fill: var(--ctrl-surface-base); stroke: var(--ctrl-fg); stroke-width: 1; }
+.ctrl .ctrl-dot { fill: var(--ctrl-surface-raised); stroke: var(--ctrl-fg); stroke-width: 1.2; }
 .ctrl .ctrl-dot.is-done { fill: var(--ctrl-fg); }
 .ctrl .ctrl-label { font-size: 11px; fill: var(--ctrl-fg); pointer-events: none; }
 .ctrl .ctrl-label.is-stale { fill: var(--ctrl-fg-3); }

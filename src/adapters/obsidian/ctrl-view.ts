@@ -304,7 +304,7 @@ export class CtrlView extends ItemView {
 		const s = svg('svg', { viewBox: '0 0 860 780', class: 'ctrl-net' }, card);
 		const defs = svg('defs', {}, s);
 		const pat = svg('pattern', { id: 'ctrl-grain', width: 4, height: 4, patternUnits: 'userSpaceOnUse' }, defs);
-		svg('circle', { cx: 2, cy: 2, r: 0.8, class: 'ctrl-grain-dot' }, pat);
+		svg('circle', { cx: 2, cy: 2, r: 0.6, class: 'ctrl-grain-dot' }, pat);
 		const n = topics.length;
 		if (!n) {
 			const t = svg('text', { x: C.x, y: C.y, class: 'ctrl-center', 'text-anchor': 'middle' }, s);
@@ -411,6 +411,8 @@ export class CtrlView extends ItemView {
 				const [x2, y2] = pol(Math.max(rE, R0 + 2), b);
 				svg('line', { x1, y1, x2, y2, class: 'ctrl-slice-sep' }, g);
 			}
+			// layering: fill + grain (back) → progress, separators (middle) → step dots (top)
+			g.querySelectorAll('.ctrl-dots').forEach((d) => g.appendChild(d));
 
 			// Soll-Marke + Δ (only when flagged, as in the design)
 			if (k.misallocFlag) {
@@ -570,7 +572,7 @@ export class CtrlView extends ItemView {
 		s.addEventListener('wheel', (e) => this.onWheel(e, () => null), { passive: false });
 		const defs = svg('defs', {}, s);
 		const pat = svg('pattern', { id: 'ctrl-grain-g', width: 4, height: 4, patternUnits: 'userSpaceOnUse' }, defs);
-		svg('circle', { cx: 2, cy: 2, r: 0.8, class: 'ctrl-grain-dot' }, pat);
+		svg('circle', { cx: 2, cy: 2, r: 0.6, class: 'ctrl-grain-dot' }, pat);
 		const tx = (x: number, y: number, text: string, cls: string, anchor = 'start', parent: Element = s) => {
 			const e = svg('text', { x, y, class: cls, 'text-anchor': anchor }, parent);
 			e.textContent = text;
