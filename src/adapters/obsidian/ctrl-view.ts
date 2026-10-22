@@ -354,6 +354,8 @@ export class CtrlView extends ItemView {
 			if (!ex) svg('path', { d: sectorPath(R0, rE, a0, a1), class: 'ctrl-sector-fill ctrl-outline ' + outline }, g);
 			else svg('path', { d: sectorPath(R0, R0 + 10, a0, a1), class: 'ctrl-sector-fill ctrl-outline ' + outline }, g);
 			let maxSteps = 0;
+			// slop grain sits directly on the fill, below progress, separators, dots and step rows
+			if (k.slop) svg('path', { d: sectorPath(R0 + push, rE + push, a0, a1), fill: 'url(#ctrl-grain)', class: 'ctrl-grain' }, g);
 
 			// slices = goals: width = 8 % minimum + rest proportional to goal energy
 			const goals = t.goals.filter((x) => x.steps.length || !x.implicit);
@@ -409,7 +411,6 @@ export class CtrlView extends ItemView {
 				const [x2, y2] = pol(Math.max(rE, R0 + 2), b);
 				svg('line', { x1, y1, x2, y2, class: 'ctrl-slice-sep' }, g);
 			}
-			if (k.slop) svg('path', { d: sectorPath(R0 + push, rE + push, a0, a1), fill: 'url(#ctrl-grain)' }, g);
 
 			// Soll-Marke + Δ (only when flagged, as in the design)
 			if (k.misallocFlag) {
