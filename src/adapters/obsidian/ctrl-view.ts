@@ -429,7 +429,15 @@ export class CtrlView extends ItemView {
 			const flip = ang > 180 && ang < 360;
 			// label starts beyond arrow and Δ so a radial arrow never runs through the text
 			const arrowEnd = rE + (k.misallocFlag ? 22 : 6) + 6 + 12 * Math.abs(k.trend) + 6;
-			const [lx, ly] = pol(ex ? Math.max(RMAX + 30, rowEnd + 14) : Math.max(RMAX + 14, arrowEnd), ang);
+			const rLabel = ex ? Math.max(RMAX + 30, rowEnd + 14) : Math.max(RMAX + 14, arrowEnd);
+			const [lx, ly] = pol(rLabel, ang);
+			// leader: hairline from the sector (behind arrow / step row) to the label
+			const r1 = ex ? rowEnd + 2 : Math.max(rE + 3, arrowEnd - 4);
+			if (rLabel - 4 - r1 > 4) {
+				const [x1, y1] = pol(r1, ang);
+				const [x2, y2] = pol(rLabel - 4, ang);
+				add(t.id, svg('line', { x1, y1, x2, y2, class: 'ctrl-leader' + dim + (k.stale ? ' is-stale' : '') }, labelG));
+			}
 			const label = add(
 				t.id,
 				svg('text', { x: lx, y: ly + 3, class: 'ctrl-label' + (k.stale ? ' is-stale' : '') + dim, 'text-anchor': flip ? 'end' : 'start', transform: `rotate(${flip ? ang + 90 : ang - 90} ${lx} ${ly})` }, labelG),

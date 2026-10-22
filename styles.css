@@ -204,3 +204,6 @@
 
 /* hit wedges lie on top; visual layers never swallow the pointer */
 .ctrl .ctrl-body, .ctrl .ctrl-label { pointer-events: none; }
+.ctrl .ctrl-leader { stroke: var(--ctrl-hairline); stroke-width: 1; transition: opacity 200ms var(--ctrl-ease); }
+.ctrl .ctrl-leader.is-stale { stroke-dasharray: 1 2; }
+.ctrl .ctrl-leader.is-dim, .ctrl .has-hover .ctrl-leader:not(.is-related) { opacity: 0.3; }
