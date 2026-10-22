@@ -207,3 +207,5 @@
 .ctrl .ctrl-leader { stroke: var(--ctrl-hairline); stroke-width: 1; transition: opacity 200ms var(--ctrl-ease); }
 .ctrl .ctrl-leader.is-stale { stroke-dasharray: 1 2; }
 .ctrl .ctrl-leader.is-dim, .ctrl .has-hover .ctrl-leader:not(.is-related) { opacity: 0.3; }
+.ctrl .ctrl-slice-outline { stroke: var(--ctrl-strong); stroke-width: 0.6; }
+.ctrl .ctrl-slice-outline.is-blocked { stroke: var(--ctrl-energy); stroke-width: 1; }

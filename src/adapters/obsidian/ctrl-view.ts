@@ -355,26 +355,28 @@ export class CtrlView extends ItemView {
 			else svg('path', { d: sectorPath(R0, R0 + 10, a0, a1), class: 'ctrl-sector-fill ctrl-outline ' + outline }, g);
 			let maxSteps = 0;
 			// slop grain sits directly on the fill, below progress, separators, dots and step rows
-			if (k.slop) svg('path', { d: sectorPath(R0 + push, rE + push, a0, a1), fill: 'url(#ctrl-grain)', class: 'ctrl-grain' }, g);
+			if (k.slop && !ex) svg('path', { d: sectorPath(R0, rE, a0, a1), fill: 'url(#ctrl-grain)', class: 'ctrl-grain' }, g);
 
 			// slices = goals: width = 8 % minimum + rest proportional to goal energy
 			const goals = t.goals.filter((x) => x.steps.length || !x.implicit);
 			const ge = goals.map((go) => k.events.filter((e) => e.goal === go.id).reduce((a, e) => a + e.conf, 0));
-			const ssum = ge.reduce((a, b) => a + b, 0) || 1;
+			const esum = ge.reduce((a, b) => a + b, 0);
+			const weight = (j: number) => (esum > 0 ? (ge[j] ?? 0) / esum : 1 / goals.length);
 			const span = a1 - a0;
 			const minW = goals.length ? span * 0.08 : 0;
 			const free = span - minW * goals.length;
 			let ga = a0;
 			const bounds: number[] = [];
 			goals.forEach((go, j) => {
-				const gw = minW + (free * (ge[j] ?? 0)) / ssum;
+				const gw = minW + free * weight(j);
 				const done = go.steps.filter((x) => x.done).length;
 				const pr = go.steps.length ? done / go.steps.length : 0;
 				if (ex) {
 					// explosion: slices pushed outwards, goal number, steps as a row outside the slice
 					const g0 = ga + 1.2;
 					const g1 = ga + gw - 1.2;
-					svg('path', { d: sectorPath(R0 + push, rE + push, g0, g1), class: 'ctrl-sector-fill ctrl-outline ' + outline }, g);
+					svg('path', { d: sectorPath(R0 + push, rE + push, g0, g1), class: 'ctrl-sector-fill ctrl-slice-outline' + (k.blocked ? ' is-blocked' : '') }, g);
+					if (k.slop) svg('path', { d: sectorPath(R0 + push, rE + push, g0, g1), fill: 'url(#ctrl-grain)', class: 'ctrl-grain' }, g);
 					if (pr > 0 && rE > R0 + 1) svg('path', { d: sectorPath(R0 + push, R0 + push + (rE - R0) * pr, g0, g1), class: 'ctrl-progress' }, g);
 					if (gw >= 5 && rE - R0 > 22) {
 						const [nx, ny] = pol(R0 + push + (rE - R0) * 0.5, (g0 + g1) / 2);
