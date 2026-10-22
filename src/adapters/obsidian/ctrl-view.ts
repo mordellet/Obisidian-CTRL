@@ -306,7 +306,6 @@ export class CtrlView extends ItemView {
 		const pat = svg('pattern', { id: 'ctrl-grain', width: 4, height: 4, patternUnits: 'userSpaceOnUse' }, defs);
 		svg('circle', { cx: 2, cy: 2, r: 0.8, class: 'ctrl-grain-dot' }, pat);
 		const n = topics.length;
-		for (const f of [0.25, 0.5, 0.75, 1]) svg('circle', { cx: C.x, cy: C.y, r: R0 + f * (RMAX - R0), class: 'ctrl-ring' }, s);
 		if (!n) {
 			const t = svg('text', { x: C.x, y: C.y, class: 'ctrl-center', 'text-anchor': 'middle' }, s);
 			t.textContent = 'Keine Themen im Board-Ordner';
