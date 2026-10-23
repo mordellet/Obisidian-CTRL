@@ -103,7 +103,9 @@ export class VaultBoardSource implements BoardSource {
 				for (const [k, v] of Object.entries(en as Record<string, unknown>)) {
 					const h = Number(v);
 					const id = ID_IN.exec(k)?.[1] ?? '';
-					if (ids.has(id) && h > 0) out.push({ ...base, topic: id, conf: h, hours: true });
+					if (h > 0 && ids.has(id)) out.push({ ...base, topic: id, conf: h, hours: true });
+					// `_` = Session-Zeit ohne Thema ("verpufft")
+					else if (h > 0 && k === '_') out.push({ ...base, topic: null, conf: h, hours: true });
 				}
 				continue;
 			}

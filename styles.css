@@ -225,3 +225,4 @@
 .ctrl .ctrl-stepbox { border-left: 2px solid var(--ctrl-energy); }
 .ctrl .ctrl-commit.is-sel, .ctrl .ctrl-open.is-sel { stroke: var(--ctrl-energy); stroke-width: 1.5; }
 .ctrl .ctrl-port-arrow { fill: none; }
+.ctrl .ctrl-energy-bar { width: 60px; }

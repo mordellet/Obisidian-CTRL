@@ -55,6 +55,7 @@ function arcPath(r: number, a0: number, a1: number): string {
 }
 
 const short = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+const h1 = (v: number) => (Math.round(v * 10) / 10).toLocaleString('de-DE');
 const mmdd = (d: string) => d.slice(5);
 const KIND_MARK: Record<Question['kind'], string> = { entscheidung: '!', frage: '?', risiko: 'r' };
 
@@ -603,9 +604,11 @@ export class CtrlView extends ItemView {
 			return;
 		}
 		const c1 = svg('text', { x: C.x, y: C.y - 2, class: 'ctrl-center', 'text-anchor': 'middle' }, s);
-		c1.textContent = `${evs.filter((e) => e.topic).length} ereignisse · ${this.win} d`;
+		const hOn = evs.filter((e) => e.topic).reduce((a, e) => a + e.conf, 0);
+		const hOff = evs.filter((e) => !e.topic && e.hours).reduce((a, e) => a + e.conf, 0);
+		c1.textContent = `${h1(hOn)} h auf themen · ${this.win} d`;
 		const c2 = svg('text', { x: C.x, y: C.y + 12, class: 'ctrl-center ctrl-center-2', 'text-anchor': 'middle' }, s);
-		c2.textContent = `${evs.filter((e) => !e.topic).length} nicht zugeordnet`;
+		c2.textContent = `${h1(hOff)} h ohne thema · ${evs.filter((e) => !e.topic && !e.hours).length} notizen offen`;
 
 		this.legend(
 			card,
@@ -1025,15 +1028,36 @@ export class CtrlView extends ItemView {
 		for (const x of qs) this.questionItem(ql, x.t, x.q, true, x.path);
 
 		const evs = this.windowEvents();
-		const un = evs.filter((e) => !e.topic).length;
+		const un = evs.filter((e) => !e.topic && !e.hours).length;
+		const hOn = evs.filter((e) => e.topic).reduce((a, e) => a + e.conf, 0);
+		const hOff = evs.filter((e) => !e.topic && e.hours).reduce((a, e) => a + e.conf, 0);
 		const rows = card.createDiv({ cls: 'ctrl-rows' });
 		const row = (k: string, v: string) => {
 			const r = rows.createDiv({ cls: 'ctrl-row' });
 			r.createSpan({ text: k });
 			r.createSpan({ text: v, cls: 'ctrl-mono' });
 		};
-		row('Ereignisse', `${evs.length - un} · ${this.win} d`);
-		row('Nicht zugeordnet', `${un} · ${evs.length ? Math.round((un / evs.length) * 100) : 0} %`);
+		row('Energie auf Themen', `${h1(hOn)} h · ${this.win} d`);
+		row('Ohne Thema (verpufft)', `${h1(hOff)} h · ${hOn + hOff ? Math.round((hOff / (hOn + hOff)) * 100) : 0} %`);
+		row('Notizen ohne Thema', String(un));
+		const per = topics.map((t) => ({ t, e: this.sig.get(t.id)?.energy ?? 0 })).sort((a, b) => b.e - a.e);
+		this.section(card, `Energie je Thema · ${this.win} d`);
+		const el = card.createDiv({ cls: 'ctrl-list' });
+		const max = Math.max(1, hOff, ...per.map((x) => x.e));
+		const bar = (label: string, h: number, onClick?: () => void) => {
+			const r = el.createDiv({ cls: 'ctrl-item ctrl-cd' });
+			const b = r.createSpan({ cls: 'ctrl-cd-bar ctrl-energy-bar' });
+			b.createSpan({ cls: 'ctrl-cd-fill', attr: { style: `width:${Math.round((h / max) * 100)}%` } });
+			const l = r.createSpan({ text: label, cls: 'ctrl-grow' + (onClick ? ' ctrl-link' : ' ctrl-muted') });
+			if (onClick) l.onclick = onClick;
+			r.createSpan({ text: `${h1(h)} h`, cls: 'ctrl-mono ctrl-small ctrl-muted' });
+		};
+		for (const x of per)
+			bar(`${x.t.id} ${x.t.name}`, x.e, () => {
+				this.sel = x.t.id;
+				this.draw();
+			});
+		bar('ohne Thema', hOff);
 		row('Erledigt im Fenster', String(sigs.reduce((a, s) => a + s.doneInWindow, 0)));
 	}
 
@@ -1101,7 +1125,7 @@ export class CtrlView extends ItemView {
 	// ── unassigned ─────────────────────────────────────────
 	private renderUnassigned(root: HTMLElement) {
 		const evs = this.windowEvents()
-			.filter((e) => !e.topic)
+			.filter((e) => !e.topic && !e.hours)
 			.sort((a, b) => b.at.localeCompare(a.at));
 		const box = root.createDiv({ cls: 'ctrl-unassigned' });
 		const left = box.createDiv();
