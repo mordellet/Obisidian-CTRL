@@ -603,12 +603,24 @@ export class CtrlView extends ItemView {
 			this.legend(card, ['explosion · slices = ziele (füllung = fortschritt) · ● erledigt ○ offen außen am slice', 'anderer sektor = umpinnen · gepinnter sektor / rad hinein = graph', 'rad heraus / esc = übersicht'], 'rad = stufe · klick = pin · doppelklick = notiz');
 			return;
 		}
-		const c1 = svg('text', { x: C.x, y: C.y - 2, class: 'ctrl-center', 'text-anchor': 'middle' }, s);
 		const hOn = evs.filter((e) => e.topic).reduce((a, e) => a + e.conf, 0);
 		const hOff = evs.filter((e) => !e.topic && e.hours).reduce((a, e) => a + e.conf, 0);
-		c1.textContent = `${h1(hOn)} h auf themen · ${this.win} d`;
-		const c2 = svg('text', { x: C.x, y: C.y + 12, class: 'ctrl-center ctrl-center-2', 'text-anchor': 'middle' }, s);
-		c2.textContent = `${h1(hOff)} h ohne thema · ${evs.filter((e) => !e.topic && !e.hours).length} notizen offen`;
+		// core: small donut = share of energy on topics vs. without topic; details on hover
+		const tot = hOn + hOff;
+		const rD = 34;
+		const core = svg('g', { class: 'ctrl-core' }, s);
+		svg('circle', { cx: C.x, cy: C.y, r: rD, class: 'ctrl-donut-bg' }, core);
+		const offAng = tot ? (hOff / tot) * 360 : 0;
+		if (tot && offAng < 359.9) svg('path', { d: arcPath(rD, offAng, 359.99), class: 'ctrl-donut-on' }, core);
+		if (offAng > 0.5) svg('path', { d: arcPath(rD, 0, Math.min(offAng, 359.99)), class: 'ctrl-donut-off' }, core);
+		const big = svg('text', { x: C.x, y: C.y + 2, class: 'ctrl-core-big', 'text-anchor': 'middle' }, core);
+		big.textContent = `${h1(tot)} h`;
+		const sub = svg('text', { x: C.x, y: C.y + 14, class: 'ctrl-core-sub', 'text-anchor': 'middle' }, core);
+		sub.textContent = tot ? `${Math.round((hOff / tot) * 100)} % ohne thema` : '';
+		const open = evs.filter((e) => !e.topic && !e.hours).length;
+		const tip = svg('title', {}, core);
+		tip.textContent = `${h1(hOn)} h auf Themen\n${h1(hOff)} h ohne Thema (verpufft)\n${open} Notizen ohne Thema · Zeitraum ${this.win} d`;
+		svg('circle', { cx: C.x, cy: C.y, r: rD + 4, class: 'ctrl-core-hit' }, core).appendChild(tip.cloneNode(true));
 
 		this.legend(
 			card,

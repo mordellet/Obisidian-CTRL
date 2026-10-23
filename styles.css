@@ -226,3 +226,11 @@
 .ctrl .ctrl-commit.is-sel, .ctrl .ctrl-open.is-sel { stroke: var(--ctrl-energy); stroke-width: 1.5; }
 .ctrl .ctrl-port-arrow { fill: none; }
 .ctrl .ctrl-energy-bar { width: 60px; }
+.ctrl .ctrl-donut-bg { fill: none; stroke: var(--ctrl-surface-overlay); stroke-width: 3; }
+.ctrl .ctrl-donut-on { fill: none; stroke: var(--ctrl-fg-2); stroke-width: 3; }
+.ctrl .ctrl-donut-off { fill: none; stroke: var(--ctrl-fg-3); stroke-width: 3; stroke-dasharray: 1.5 1.5; }
+.ctrl .ctrl-core-big { font-family: var(--ctrl-mono); font-size: 12px; fill: var(--ctrl-fg); }
+.ctrl .ctrl-core-sub { font-family: var(--ctrl-mono); font-size: 7px; fill: var(--ctrl-fg-3); }
+.ctrl .ctrl-core-hit { fill: transparent; cursor: help; }
+.ctrl .ctrl-core { pointer-events: all; }
+.ctrl .is-exploded .ctrl-core { display: none; }
