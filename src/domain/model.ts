@@ -85,8 +85,10 @@ export interface BoardEvent {
 	at: IsoDate;
 	topic: string | null;
 	goal?: string;
-	/** 1.0 explicit property, 0.6 link */
+	/** Gewicht in Stunden-Äquivalent: Essenz = Stunden, thema: 0.5, Link 0.25 */
 	conf: number;
+	/** aus der Tages-Essenz (Session-Stunden) */
+	hours?: boolean;
 }
 
 export interface MainSection {

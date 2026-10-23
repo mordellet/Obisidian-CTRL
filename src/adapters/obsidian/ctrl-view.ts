@@ -609,7 +609,7 @@ export class CtrlView extends ItemView {
 
 		this.legend(
 			card,
-			['radius = energie · slice = ziel (breite = anteil, füllung = fortschritt)', '▮ soll-marke + Δ = fehlallokation · pfeil = richtung · körnung = slop', 'gepunktet + blass = stale · farbe = nur blockiert'],
+			['radius = energie (stunden) · slice = ziel (breite = anteil, füllung = fortschritt)', '▮ soll-marke + Δ = fehlallokation · pfeil = richtung · körnung = slop', 'gepunktet + blass = stale · farbe = nur blockiert'],
 			'klick = graph · rad hinein = explosion · doppelklick = notiz',
 		);
 	}
@@ -898,7 +898,7 @@ export class CtrlView extends ItemView {
 			r.createSpan({ text: k });
 			r.createSpan({ text: v, cls: 'ctrl-mono' });
 		};
-		row('Energie', `${sg.energy} · ${this.win} d`);
+		row('Energie', `${sg.energy} h · ${this.win} d`);
 		row('Richtung', `${sg.trend > 0.12 ? '▲' : sg.trend < -0.12 ? '▼' : '–'} ${sg.prevEnergy} → ${sg.energy}`);
 		row('Fortschritt', `${sg.done}/${sg.total} · ${Math.round(sg.progress * 100)} %`);
 		row('Letzter Fortschritt', sg.staleDays === null ? 'nie datiert' : `vor ${sg.staleDays} d`);
@@ -961,7 +961,7 @@ export class CtrlView extends ItemView {
 		for (const e of sg.events.slice(0, 6)) {
 			const r = ev.createDiv({ cls: 'ctrl-item ctrl-link' });
 			r.createSpan({ text: `${mmdd(e.at)} · ${short(e.title, 32)}` });
-			r.createSpan({ text: e.conf >= 1 ? 'thema' : 'link', cls: 'ctrl-mono ctrl-small ctrl-muted' });
+			r.createSpan({ text: e.hours ? `${e.conf} h` : e.conf >= 0.5 ? 'thema' : 'link', cls: 'ctrl-mono ctrl-small ctrl-muted' });
 			r.onclick = () => this.openNote(e.path);
 		}
 	}

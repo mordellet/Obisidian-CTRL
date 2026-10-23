@@ -6,6 +6,10 @@ import { parseBody } from '../../domain/parse';
 import type { BoardSource } from '../../ports/board';
 import { list, type CtrlSettings } from './settings';
 
+/** Stunden-Äquivalent einer zugeordneten Notiz (thema:) bzw. eines Links. */
+const NOTE_H = 0.5;
+const LINK_H = 0.25;
+
 const ID_IN = /\b([A-Z]+\d+)(?:\.\d+)*\b/;
 
 function arr(v: unknown): string[] {
@@ -93,6 +97,16 @@ export class VaultBoardSource implements BoardSource {
 			const fm = this.app.metadataCache.getFileCache(f)?.frontmatter;
 			const at = toIsoDate(fm?.date) ?? toIsoDate(fm?.created) ?? fromEpoch(f.stat.mtime);
 			const base = { path: f.path, title: f.basename, at };
+			// Tages-Essenz: `energie: {S8: 2.5, S1: 1}` in der Daily Note = Stunden je Thema (ersetzt thema/Links)
+			const en: unknown = fm?.energie;
+			if (en && typeof en === 'object' && !Array.isArray(en)) {
+				for (const [k, v] of Object.entries(en as Record<string, unknown>)) {
+					const h = Number(v);
+					const id = ID_IN.exec(k)?.[1] ?? '';
+					if (ids.has(id) && h > 0) out.push({ ...base, topic: id, conf: h, hours: true });
+				}
+				continue;
+			}
 			const explicit = arr(fm?.thema)
 				.map((v) => ID_IN.exec(v)?.[1] ?? '')
 				.filter((v) => ids.has(v));
@@ -100,8 +114,8 @@ export class VaultBoardSource implements BoardSource {
 			const linked = Object.keys(resolved[f.path] ?? {})
 				.map((p) => byPath.get(p)?.id)
 				.filter((v): v is string => !!v && !explicit.includes(v));
-			for (const id of explicit) out.push({ ...base, topic: id, goal, conf: 1 });
-			for (const id of linked) out.push({ ...base, topic: id, conf: 0.6 });
+			for (const id of explicit) out.push({ ...base, topic: id, goal, conf: NOTE_H });
+			for (const id of linked) out.push({ ...base, topic: id, conf: LINK_H });
 			const isDaily = fm?.type === 'daily' || f.path.startsWith('06-Daily');
 			if (!explicit.length && !linked.length && !isDaily) out.push({ ...base, topic: null, conf: 0 });
 		}
