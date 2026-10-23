@@ -225,7 +225,12 @@ export class CtrlView extends ItemView {
 	private onWheel(e: WheelEvent, over: () => string | null) {
 		e.preventDefault();
 		const now = Date.now();
-		if (now < this.lock) return;
+		// one gesture = one stage: after a step, every further wheel event (trackpad inertia)
+		// extends the lock; only a pause of 250 ms ends the gesture
+		if (now < this.lock) {
+			this.lock = now + 250;
+			return;
+		}
 		this.acc += e.deltaY * (e.ctrlKey ? 5 : 1);
 		if (Math.abs(this.acc) < 90) return;
 		const dir = this.acc;
